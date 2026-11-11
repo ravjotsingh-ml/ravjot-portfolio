@@ -108,9 +108,17 @@ export default function About() {
                 </Button>
               </div>
 
-              <p className="mt-4 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-faint">
-                Résumé available on request
-              </p>
+              <div className="mt-4 text-center">
+                <a
+                  href="/Ravjot_Singh_Resume.pdf"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-accent"
+                >
+                  <Icon name="download" size={13} />
+                  Download Résumé (PDF)
+                </a>
+              </div>
             </div>
           </Reveal>
         </div>

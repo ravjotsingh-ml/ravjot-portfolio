@@ -179,7 +179,18 @@ export default function Hero() {
                   className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                 />
               </Button>
-              <Button as="a" href="#contact" variant="outline" size="lg">
+              <Button
+                as="a"
+                href="/Ravjot_Singh_Resume.pdf"
+                target="_blank"
+                rel="noreferrer noopener"
+                variant="outline"
+                size="lg"
+              >
+                Download CV
+                <Icon name="download" size={16} />
+              </Button>
+              <Button as="a" href="#contact" variant="ghost" size="lg">
                 Get in touch
                 <Icon name="arrow-right" size={16} />
               </Button>
