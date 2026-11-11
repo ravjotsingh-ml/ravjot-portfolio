@@ -144,15 +144,12 @@ python3 check_gemini.py
 
 ## Social links
 
-Social URLs live in `src/data/portfolio.js` under `profile.socials`. The current
-values are **clearly marked placeholders**:
+Social URLs live in `src/data/portfolio.js` under `profile.socials`:
 
-- `https://github.com/YOUR_GITHUB_USERNAME`
-- `https://x.com/YOUR_X_USERNAME`
-- `https://www.linkedin.com/in/YOUR_LINKEDIN_USERNAME`
+- `https://github.com/ravjotsingh-ml`
+- `https://www.linkedin.com/in/ravjot-singh-24608b34b`
 
-Replace them with the real profile URLs. They are rendered in the Hero, Contact
-and Footer with `target="_blank"` and `rel="noopener noreferrer"`.
+They are rendered in the Hero, Contact and Footer with `target="_blank"` and `rel="noopener noreferrer"`.
 
 ## Database migrations
 

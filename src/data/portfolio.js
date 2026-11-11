@@ -21,7 +21,7 @@ export const profile = {
     'From training video-processing pipelines with OpenCV and zero-shot vision models to crafting production e-commerce platforms with Gemini AI chatbots, I love solving real-world challenges from low-level data flows to polished user experiences.',
   ],
   socials: [
-    { label: 'LinkedIn', icon: 'linkedin', href: 'https://www.linkedin.com/in/YOUR_LINKEDIN_USERNAME' },
+    { label: 'LinkedIn', icon: 'linkedin', href: 'https://www.linkedin.com/in/ravjot-singh-24608b34b' },
     { label: 'GitHub', icon: 'github', href: 'https://github.com/ravjotsingh-ml' },
     { label: 'Email', icon: 'mail', href: 'mailto:ravjotsg03@gmail.com' },
   ],
