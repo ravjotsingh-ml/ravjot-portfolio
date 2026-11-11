@@ -41,10 +41,10 @@ export default function Projects() {
             title={
               <>
                 A few things I’ve{' '}
-                <span className="font-serif font-normal italic text-accent">shipped.</span>
+                <span className="font-serif font-normal italic text-accent">built.</span>
               </>
             }
-            description="Six projects, each one a partnership. Open a case study to see the challenge, the decisions, and the outcome."
+            description="Flagship projects across full-stack engineering, computer vision, and AI-driven platforms. Open any case study to review the architecture, challenge, and solution."
           />
 
           <div className="flex shrink-0 flex-wrap gap-1.5" role="group" aria-label="Filter projects">

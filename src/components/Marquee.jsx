@@ -1,15 +1,8 @@
-const items = [
-  'React',
-  'TypeScript',
-  'Design systems',
-  'Motion design',
-  'Accessibility',
-  'Performance',
-  'Product design',
-  'Tailwind CSS',
-]
+import { marqueeSkills } from '../data/portfolio'
 
 export default function Marquee() {
+  const items = marqueeSkills
+
   return (
     <div className="marquee relative overflow-hidden border-y border-line bg-white/[0.012] py-4">
       <div className="marquee-track flex w-max">

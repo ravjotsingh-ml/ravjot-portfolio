@@ -29,7 +29,7 @@ export default function Skills() {
               <span className="font-serif font-normal italic text-accent">carefully.</span>
             </>
           }
-          description="I keep the stack small and intentional. The goal is never more tools — it’s fewer seams between the design and the product people use."
+          description="Hands-on experience in Agentic AI, Machine Learning, full-stack engineering, and computer vision — powered by Python, FastAPI, Django, and modern tooling."
         />
 
         <div className="mt-14 grid gap-12 lg:mt-20 lg:grid-cols-12 lg:gap-16">
@@ -44,17 +44,16 @@ export default function Skills() {
                     strokeWidth={1.3}
                   />
                   <blockquote className="mt-5 text-pretty text-lg font-light leading-[1.55] tracking-[-0.01em] text-ink/90">
-                    “Ravjot is the rare designer who can hand you a polished Figma file and
-                    the production code to match. Our team moved faster because of it.”
+                    “Skilled in bridging agentic workflows, computer vision pipelines, and robust REST APIs into cohesive, high-impact applications.”
                   </blockquote>
                   <figcaption className="mt-6 flex items-center gap-3 border-t border-white/[0.07] pt-5">
                     <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#3c4a24] to-[#1a2013] font-mono text-[11px] text-accent">
-                      MC
+                      RS
                     </span>
                     <span>
-                      <span className="block text-sm font-medium text-ink">Maya Chen</span>
+                      <span className="block text-sm font-medium text-ink">Engineering Profile</span>
                       <span className="mt-0.5 block text-[11px] text-faint">
-                        VP Product, Northwind Labs
+                        Agentic AI &amp; Full-Stack Systems
                       </span>
                     </span>
                   </figcaption>

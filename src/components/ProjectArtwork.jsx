@@ -1,4 +1,7 @@
 const domains = {
+  scholarsync: 'scholarsync.edu',
+  'cracked-screen': 'screencheck.ai',
+  beantheory: 'beantheory.coffee',
   northwind: 'northwind.app',
   atlas: 'atlas.study',
   lumen: 'lumen.bank',

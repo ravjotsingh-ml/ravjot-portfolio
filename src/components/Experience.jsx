@@ -19,11 +19,11 @@ export default function Experience() {
           eyebrow="Experience"
           title={
             <>
-              Six years of shipping things that{' '}
-              <span className="font-serif font-normal italic text-accent">matter.</span>
+              Hands-on experience in{' '}
+              <span className="font-serif font-normal italic text-accent">industry.</span>
             </>
           }
-          description="I’ve worked in product teams, small studios, and solo — always close to the work, always accountable for the outcome."
+          description="Developing agentic AI systems, computer vision pipelines, and full-stack web applications in engineering teams."
         />
 
         <div className="mt-14 grid gap-12 lg:mt-20 lg:grid-cols-12 lg:gap-16">
@@ -34,15 +34,27 @@ export default function Experience() {
                   <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-faint">
                     Education
                   </p>
-                  <p className="mt-4 text-[15px] font-medium text-ink">{education.degree}</p>
-                  <p className="mt-1 text-[13px] text-muted">
-                    {education.school}
-                    <span className="mx-2 text-white/20">·</span>
-                    {education.period}
-                  </p>
-                  <p className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-relaxed text-faint">
-                    {education.note}
-                  </p>
+                  <div className="mt-3 divide-y divide-white/[0.06]">
+                    {(Array.isArray(education) ? education : [education]).map((item) => (
+                      <div key={item.degree} className="py-3.5 first:pt-1 last:pb-0">
+                        <p className="text-[14px] font-medium text-ink">{item.degree}</p>
+                        <p className="mt-1 text-[12px] text-muted">
+                          {item.school}
+                          {item.period ? (
+                            <>
+                              <span className="mx-2 text-white/20">·</span>
+                              {item.period}
+                            </>
+                          ) : null}
+                        </p>
+                        {item.note && (
+                          <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
+                            {item.note}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </Reveal>
 

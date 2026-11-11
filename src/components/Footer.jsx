@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { navLinks, profile } from '../data/portfolio'
 import Icon from './ui/Icon'
 
-function formatTorontoTime() {
+function formatLocalTime() {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Toronto',
+    timeZone: profile.timezoneName || 'Asia/Kolkata',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -12,17 +12,17 @@ function formatTorontoTime() {
 }
 
 function LocalTime() {
-  const [time, setTime] = useState(formatTorontoTime)
+  const [time, setTime] = useState(formatLocalTime)
 
   useEffect(() => {
-    const interval = window.setInterval(() => setTime(formatTorontoTime()), 30000)
+    const interval = window.setInterval(() => setTime(formatLocalTime()), 30000)
     return () => window.clearInterval(interval)
   }, [])
 
   return (
     <span className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
       <span className="h-1 w-1 rounded-full bg-accent/70" aria-hidden="true" />
-      Toronto · {time}
+      India · {time}
     </span>
   )
 }
@@ -41,8 +41,7 @@ export default function Footer() {
               <span className="sr-only">— back to top</span>
             </a>
             <p className="mt-5 max-w-xs text-pretty text-[13px] leading-relaxed text-muted">
-              Designing and building thoughtful digital products from Toronto. Currently open to
-              select projects.
+              Building intelligent AI systems and robust full-stack applications. Open to full-time engineering roles and collaborative projects.
             </p>
             <div className="mt-6 flex items-center gap-2">
               {profile.socials.map((social) => (

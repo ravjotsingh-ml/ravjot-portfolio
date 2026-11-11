@@ -17,19 +17,29 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
-def seed_database(db: Session) -> None:
-    """Insert default portfolio data when tables are empty."""
+def seed_database(db: Session, force: bool = False) -> None:
+    """Insert default portfolio data when tables are empty or force is True."""
+    if force:
+        db.query(SkillItem).delete()
+        db.query(SkillGroup).delete()
+        db.query(Project).delete()
+        db.query(Experience).delete()
+        db.query(Education).delete()
+        db.query(Award).delete()
+        db.query(PortfolioInfo).delete()
+        db.commit()
+
     created = False
 
     if db.query(PortfolioInfo).count() == 0:
         db.add(
             PortfolioInfo(
                 name="Ravjot Singh",
-                tagline="Designing and building digital products that feel effortless.",
-                role="Front-end Engineer & Interface Designer",
-                location="Toronto, Canada",
-                email="hello@ravjotsingh.dev",
-                availability="Available for new projects",
+                tagline="Computer Science Engineering graduate skilled in Python, FastAPI, Django, REST APIs, and PostgreSQL. Experienced in Agentic AI, Machine Learning, and Computer Vision.",
+                role="AI & Full-Stack Engineer",
+                location="Punjab, India",
+                email="ravjotsg03@gmail.com",
+                availability="Available for full-time roles & projects",
             )
         )
         created = True
@@ -37,118 +47,61 @@ def seed_database(db: Session) -> None:
     if db.query(Project).count() == 0:
         projects = [
             {
-                "title": "Northwind Analytics",
-                "tagline": "Product analytics, made legible.",
-                "category": "SaaS",
+                "title": "Scholar Sync",
+                "tagline": "Academic platform for marks, assignments & records.",
+                "category": "Full-Stack",
                 "year": "2026",
-                "role": "Lead designer & front-end engineer",
-                "timeline": "14 weeks",
-                "overview": "Northwind's data platform was powerful but impenetrable. I led the redesign of their core analytics workspace — from information architecture and design system through to a highly performant React front end.",
-                "challenge": "Customers were exporting CSVs to make sense of their own dashboards. The interface surfaced every metric at once, creating noise instead of insight.",
-                "solution": "We rebuilt the experience around progressive disclosure: a focused overview, composable saved views, and a query language that non-analysts can actually use. A new charting layer renders 50k+ points without dropping a frame.",
+                "role": "Full-Stack Developer",
+                "timeline": "Academic Capstone",
+                "overview": "Scholar Sync is a comprehensive academic portal built to streamline student and faculty workflows. It provides real-time access to marks, assignment submissions, and academic announcements.",
+                "challenge": "Academic institutions often struggle with fragmented portals for student marks, assignment submissions, and faculty announcements, leading to sync issues and poor student experience.",
+                "solution": "Architected a scalable full-stack web application with role-based access control (RBAC), high-throughput FastAPI REST endpoints, and a responsive React frontend backed by structured PostgreSQL relational schemas.",
                 "metrics": [
-                    {"value": "31%", "label": "faster time-to-insight"},
-                    {"value": "2.4×", "label": "dashboard adoption"},
-                    {"value": "98", "label": "Lighthouse performance"},
+                    {"value": "FastAPI", "label": "REST backend"},
+                    {"value": "PostgreSQL", "label": "Relational database"},
+                    {"value": "100% RBAC", "label": "Role-based access"},
                 ],
-                "tags": ["React", "TypeScript", "D3.js", "Tailwind CSS"],
-                "accent_color": "#d9ff43",
-                "visual_type": "analytics",
+                "tags": ["Python", "FastAPI", "PostgreSQL", "React", "Tailwind CSS", "JavaScript"],
+                "accent_color": "#6fe3c1",
+                "visual_type": "system",
             },
             {
-                "title": "Atlas Research",
-                "tagline": "An AI copilot for deep research.",
-                "category": "SaaS",
-                "year": "2025",
-                "role": "Product designer & front-end lead",
-                "timeline": "10 weeks",
-                "overview": "Atlas asked a hard question: how do you make an AI research tool that people actually trust? I designed and built the reading and synthesis experience, with citations woven into every answer.",
-                "challenge": "Early users loved the answers but didn't trust them. Hallucinations eroded confidence and long responses felt like a black box.",
-                "solution": "Every claim links back to a highlighted source passage. A side-by-side reading mode lets researchers verify in context, while streaming responses and optimistic UI keep the tool feeling instant.",
+                "title": "Cracked Screen Detection",
+                "tagline": "Intelligent video inspection & screen condition analysis.",
+                "category": "Computer Vision",
+                "year": "2026",
+                "role": "Computer Vision & AI Developer",
+                "timeline": "8 weeks",
+                "overview": "An automated inspection pipeline designed for mobile devices. It processes smartphone condition videos, eliminates blur, identifies phone orientation, and detects screen fractures.",
+                "challenge": "Raw inspection videos contain hundreds of repetitive, blurry, or misoriented frames, making manual assessment tedious and automated classification prone to false positives.",
+                "solution": "Implemented computer vision algorithms in OpenCV for blur filtering, orientation detection, and side identification to extract clear keyframes. Integrated Hugging Face zero-shot models and multimodal LLM analysis to accurately identify and log cracked screen evidence.",
                 "metrics": [
-                    {"value": "63%", "label": "weekly retention lift"},
-                    {"value": "4.8/5", "label": "trust score"},
-                    {"value": "<120ms", "label": "interaction latency"},
+                    {"value": "OpenCV", "label": "Blur filtering & keyframe selection"},
+                    {"value": "Zero-shot", "label": "Hugging Face vision models"},
+                    {"value": "LLM Vision", "label": "Automated crack identification"},
                 ],
-                "tags": ["Next.js", "TypeScript", "OpenAI", "Streaming"],
+                "tags": ["Python", "FastAPI", "React", "OpenCV", "Tesseract OCR", "Hugging Face"],
                 "accent_color": "#7c9cff",
                 "visual_type": "ai",
             },
             {
-                "title": "Lumen Banking",
-                "tagline": "Money, finally in focus.",
-                "category": "Mobile",
-                "year": "2025",
-                "role": "Product designer & design systems",
-                "timeline": "22 weeks",
-                "overview": "Lumen is a challenger bank for freelancers. I owned the end-to-end product design and built the React Native component library that powers their iOS and Android apps.",
-                "challenge": "Freelancers juggle irregular income, taxes, and multiple accounts. Existing banking apps added anxiety instead of removing it.",
-                "solution": "A single “safe to spend” number, automatic tax set-asides, and a transaction feed that groups spending by project. Motion and haptics make every state change feel tangible without slowing things down.",
+                "title": "BeanTheory Coffee E-Commerce",
+                "tagline": "Specialty coffee storefront with Gemini AI chatbot.",
+                "category": "E-Commerce",
+                "year": "2026",
+                "role": "Full-Stack Python Developer",
+                "timeline": "6-month Industrial Project",
+                "overview": "BeanTheory is an artisanal coffee e-commerce platform offering an interactive shopping experience. It features full catalog browsing, cart and checkout flows, automated PDF invoice generation, and a Gemini-powered AI chatbot.",
+                "challenge": "Creating an engaging shopping experience that provides instant conversational assistance while managing transactional consistency and automated customer notifications.",
+                "solution": "Developed a comprehensive Django application backed by PostgreSQL. Embedded an interactive Google Gemini AI chatbot for real-time recommendations, combined with automated PDF invoice generation and email confirmations upon order completion.",
                 "metrics": [
-                    {"value": "+38%", "label": "activation rate"},
-                    {"value": "4.9★", "label": "App Store rating"},
-                    {"value": "−27%", "label": "support tickets"},
+                    {"value": "Gemini AI", "label": "Conversational assistant"},
+                    {"value": "Django + SQL", "label": "Robust transactional backend"},
+                    {"value": "Automated", "label": "PDF invoices & emails"},
                 ],
-                "tags": ["React Native", "TypeScript", "Figma", "Reanimated"],
-                "accent_color": "#c4a7ff",
-                "visual_type": "finance",
-            },
-            {
-                "title": "Tideline",
-                "tagline": "Slow travel, beautifully planned.",
-                "category": "Mobile",
-                "year": "2024",
-                "role": "Design partner & front-end developer",
-                "timeline": "12 weeks",
-                "overview": "Tideline is a bootstrapped travel app with a contrarian thesis: fewer notifications, fewer lists, more presence. I partnered with the founders from naming through launch.",
-                "challenge": "Travel apps compete on features, overwhelming users with itineraries, maps, and bookings. Tideline needed to feel like a deep breath.",
-                "solution": "An editorial, photo-led home feed, one-tap day plans, and offline-first saves. The interface uses generous whitespace and a restrained palette so the destinations remain the hero.",
-                "metrics": [
-                    {"value": "18k", "label": "first-month installs"},
-                    {"value": "4.7★", "label": "average rating"},
-                    {"value": "92%", "label": "day-7 retention"},
-                ],
-                "tags": ["React Native", "Expo", "Supabase", "Reanimated"],
-                "accent_color": "#6fe3c1",
-                "visual_type": "travel",
-            },
-            {
-                "title": "Forma Studio",
-                "tagline": "Space for architecture to breathe.",
-                "category": "Websites",
-                "year": "2024",
-                "role": "Design & development",
-                "timeline": "8 weeks",
-                "overview": "Forma needed a digital home as considered as their buildings. The result is a minimal, typographically driven site with a custom project viewer and a lightweight CMS.",
-                "challenge": "Architecture photography is heavy. The previous site loaded 12MB of unoptimised images and buried projects behind a confusing grid.",
-                "solution": "Responsive AVIF/WebP art direction, blur-up placeholders, and a gallery that respects the images. Animations are limited to opacity and transform so scrolling stays glassy on mobile.",
-                "metrics": [
-                    {"value": "0.7s", "label": "largest contentful paint"},
-                    {"value": "100", "label": "Lighthouse performance"},
-                    {"value": "+54%", "label": "enquiries"},
-                ],
-                "tags": ["React", "Vite", "GSAP", "Sanity"],
+                "tags": ["Python", "Django", "PostgreSQL", "Gemini AI", "HTML & CSS", "Bootstrap"],
                 "accent_color": "#ffb178",
-                "visual_type": "studio",
-            },
-            {
-                "title": "Mono Design System",
-                "tagline": "One language, forty products.",
-                "category": "Systems",
-                "year": "2023",
-                "role": "Founder & maintainer",
-                "timeline": "Ongoing",
-                "overview": "Mono is an open-source design system I created and maintain. It now powers a suite of enterprise products and is used by more than 40 engineers every week.",
-                "challenge": "Twelve teams were shipping twelve different buttons. Inconsistent accessibility, duplicate work, and a brand that drifted with every release.",
-                "solution": "A three-tier token architecture, headless accessible primitives, and documentation that lives inside Storybook. Adoption was driven by codemods and a dedicated office-hours ritual, not mandates.",
-                "metrics": [
-                    {"value": "40+", "label": "weekly users"},
-                    {"value": "−60%", "label": "UI build time"},
-                    {"value": "WCAG", "label": "2.2 AA compliant"},
-                ],
-                "tags": ["React", "TypeScript", "Storybook", "Radix UI"],
-                "accent_color": "#ff9ecf",
-                "visual_type": "system",
+                "visual_type": "finance",
             },
         ]
         for item in projects:
@@ -159,24 +112,56 @@ def seed_database(db: Session) -> None:
         groups = [
             {
                 "idx": "01",
-                "title": "Front-end engineering",
-                "blurb": "Production-grade interfaces, built to last.",
-                "icon_name": "code",
-                "items": ["React", "TypeScript", "Next.js", "Tailwind CSS", "JavaScript", "HTML & CSS", "Vite", "React Query"],
+                "title": "Agentic AI, ML & Computer Vision",
+                "blurb": "Autonomous agents, multimodal intelligence, and vision pipelines.",
+                "icon_name": "sparkles",
+                "items": [
+                    "LangChain",
+                    "LangGraph",
+                    "LLMs",
+                    "Swiggy MCP",
+                    "Gemini AI",
+                    "Hugging Face",
+                    "OpenCV",
+                    "Tesseract OCR",
+                    "Machine Learning",
+                ],
             },
             {
                 "idx": "02",
-                "title": "Interface & product design",
-                "blurb": "From first sketch to polished system.",
-                "icon_name": "palette",
-                "items": ["Figma", "Design systems", "Interaction design", "Prototyping", "Motion design", "Accessibility"],
+                "title": "Backend & Databases",
+                "blurb": "High-throughput APIs, schemas, and vector stores.",
+                "icon_name": "code",
+                "items": [
+                    "Python",
+                    "FastAPI",
+                    "Django",
+                    "Django REST Framework",
+                    "REST APIs",
+                    "PostgreSQL",
+                    "pgvector",
+                    "ChromaDB",
+                    "SQLite3",
+                ],
             },
             {
                 "idx": "03",
-                "title": "Tooling & craft",
-                "blurb": "The unglamorous work that keeps things sharp.",
+                "title": "Frontend & Developer Tools",
+                "blurb": "Modern web UIs, data tools, and testing utilities.",
                 "icon_name": "layers",
-                "items": ["Git & GitHub", "Storybook", "Vitest", "Vercel", "CI / CD", "Web performance", "SEO", "Analytics"],
+                "items": [
+                    "React",
+                    "Tailwind CSS",
+                    "JavaScript",
+                    "HTML & CSS",
+                    "Git & GitHub",
+                    "VS Code",
+                    "pgAdmin",
+                    "Playwright",
+                    "SerpAPI",
+                    "Streamlit",
+                    "NumPy & Pandas",
+                ],
             },
         ]
         for group in groups:
@@ -191,43 +176,31 @@ def seed_database(db: Session) -> None:
     if db.query(Experience).count() == 0:
         jobs = [
             {
-                "role": "Senior Front-end Engineer",
-                "company": "Northwind Labs",
-                "period": "2023 — Present",
-                "location": "Toronto · Remote",
-                "summary": "Lead front-end for Northwind's analytics platform, working alongside product and design to raise the bar on craft and performance.",
+                "role": "Trainee — Machine Learning | Agentic AI",
+                "company": "Seasia Group of Companies",
+                "period": "Jun 2026 — Present",
+                "location": "Mohali, Punjab · Hybrid",
+                "summary": "Building agentic AI food recommendation systems and automated computer vision inspection pipelines.",
                 "achievements": [
-                    "Rebuilt the core workspace in React and TypeScript, cutting interaction latency by 47% and lifting dashboard adoption 2.4×.",
-                    "Introduced a token-driven design system adopted by four product squads, reducing UI build time by roughly 60%.",
-                    "Mentored three engineers and established the team's accessibility and performance review process.",
+                    "Developing an Agentic AI food recommendation system using Swiggy MCP, LangChain, and LangGraph to identify suitable food combinations based on user prompts.",
+                    "Working with ChromaDB and PostgreSQL with pgvector for vector storage and retrieval to support context-aware food matching.",
+                    "Developing a cracked phone detection system using Python, FastAPI, OpenCV, and Tesseract OCR to process inspection videos and select clear, representative frames.",
+                    "Integrating Hugging Face zero-shot models and LLM-based visual analysis to assess phone condition and detect screen cracks.",
                 ],
-                "tags": ["React", "TypeScript", "Design systems", "Performance"],
+                "tags": ["Agentic AI", "LangChain", "LangGraph", "Swiggy MCP", "ChromaDB", "pgvector", "OpenCV", "FastAPI"],
             },
             {
-                "role": "Front-end Engineer & Designer",
-                "company": "Studio Nomad",
-                "period": "2021 — 2023",
-                "location": "Remote",
-                "summary": "A six-person studio building brand-led digital experiences for architecture, fashion, and culture clients.",
+                "role": "Industrial Trainee — Data Science, Python, Machine Learning & AI",
+                "company": "CS Soft Solutions (India) Pvt. Ltd.",
+                "period": "Dec 2025 — May 2026",
+                "location": "Mohali, Punjab",
+                "summary": "Completed a 6-month intensive industrial training in Python, Data Science, Machine Learning, and AI application development.",
                 "achievements": [
-                    "Designed and shipped 14 award-considered marketing sites, averaging 98+ Lighthouse scores.",
-                    "Created the studio's reusable motion and page-transition toolkit, cutting project setup from days to hours.",
-                    "Partnered directly with clients on strategy, art direction, and front-end delivery.",
+                    "Completed six months of industrial training in Python, Data Science, Machine Learning, and Artificial Intelligence.",
+                    "Developed BeanTheory, a coffee e-commerce application using Django and PostgreSQL, with authentication and product management.",
+                    "Integrated a Gemini AI chatbot, automated PDF invoices, and email delivery.",
                 ],
-                "tags": ["Next.js", "GSAP", "Sanity", "Art direction"],
-            },
-            {
-                "role": "UI Designer & Developer",
-                "company": "Independent",
-                "period": "2019 — 2021",
-                "location": "Toronto",
-                "summary": "Freelance designer-developer helping early-stage startups turn rough ideas into shippable product interfaces.",
-                "achievements": [
-                    "Launched MVPs for seven pre-seed startups across fintech, health, and creator tools.",
-                    "Built a reputation for fast, opinionated design paired with clean, maintainable code.",
-                    "Ran discovery workshops and usability tests that shaped product roadmaps.",
-                ],
-                "tags": ["React", "Figma", "Product design", "Prototyping"],
+                "tags": ["Python", "Django", "PostgreSQL", "Machine Learning", "Gemini AI", "Data Science"],
             },
         ]
         for item in jobs:
@@ -237,20 +210,57 @@ def seed_database(db: Session) -> None:
     if db.query(Education).count() == 0:
         db.add(
             Education(
-                degree="B.Des, Interaction Design",
-                school="OCAD University",
-                period="2015 — 2019",
-                note="Graduated with honours. Thesis on accessible interface motion.",
+                degree="B.Tech. in Computer Science and Engineering",
+                school="Guru Nanak Dev University, Jalandhar, Punjab",
+                period="2022 — 2026",
+                note="CGPA: 7.91 · Focused on Software Engineering, Machine Learning, and Full-Stack Development.",
+            )
+        )
+        db.add(
+            Education(
+                degree="Class XII (Non-Medical)",
+                school="Kamla Nehru Public School, Phagwara, Punjab",
+                period="2021 — 2022",
+                note="Score: 75.2%",
+            )
+        )
+        db.add(
+            Education(
+                degree="Class X",
+                school="Kamla Nehru Public School, Phagwara, Punjab",
+                period="2019 — 2020",
+                note="Score: 82.4%",
             )
         )
         created = True
 
     if db.query(Award).count() == 0:
-        db.add(Award(title="Awwwards Honourable Mention", detail="Forma Studio · 2024"))
-        db.add(Award(title="CSS Design Awards — Best UI", detail="Tideline · 2024"))
-        db.add(Award(title="Northwind Craft Award", detail="Design systems · 2025"))
+        db.add(
+            Award(
+                title="First Prize — Web Mania",
+                detail="Inter-College Competition · March 2025",
+            )
+        )
+        db.add(
+            Award(
+                title="Third Prize — Technical Competition",
+                detail="Inter-College TechFest · 2025",
+            )
+        )
+        db.add(
+            Award(
+                title="Third Prize — Inter-College Event",
+                detail="Technical Symposium · 2025",
+            )
+        )
+        db.add(
+            Award(
+                title="Participant & Finalist",
+                detail="Technical Innovation Competition · December 2025",
+            )
+        )
         created = True
 
     if created:
         db.commit()
-        logger.info("Portfolio database seeded with default content.")
+        logger.info("Portfolio database seeded with updated resume content.")

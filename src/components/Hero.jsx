@@ -54,7 +54,7 @@ function HeroCard() {
                   rs
                 </span>
                 <p className="mt-5 font-mono text-[8px] uppercase tracking-[0.36em] text-white/35">
-                  Design × Engineering
+                  AI × Full-Stack Engineering
                 </p>
               </div>
             </div>
@@ -62,10 +62,10 @@ function HeroCard() {
             <div className="absolute inset-x-3 bottom-3 z-10 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/45 p-4 backdrop-blur-md">
               <div className="min-w-0">
                 <p className="truncate font-serif text-[22px] italic leading-tight text-white">
-                  Ravjot Singh
+                  {profile.name}
                 </p>
                 <p className="mt-1 truncate font-mono text-[8px] uppercase tracking-[0.18em] text-white/40">
-                  Front-end engineer & designer
+                  {profile.role}
                 </p>
               </div>
               <a
@@ -81,7 +81,7 @@ function HeroCard() {
               aria-hidden="true"
               className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-180 font-mono text-[8px] uppercase tracking-[0.4em] text-white/20 [writing-mode:vertical-rl] sm:block"
             >
-              Toronto · Canada
+              {profile.location}
             </span>
           </div>
         </div>
@@ -94,8 +94,8 @@ function HeroCard() {
             <Icon name="zap" size={17} />
           </span>
           <span>
-            <span className="block text-sm font-semibold leading-none text-ink">6+ years</span>
-            <span className="mt-1 block text-[10px] leading-none text-faint">crafting products</span>
+            <span className="block text-sm font-semibold leading-none text-ink">7.91</span>
+            <span className="mt-1 block text-[10px] leading-none text-faint">B.Tech CGPA</span>
           </span>
         </div>
 
@@ -113,8 +113,8 @@ function HeroCard() {
             ))}
           </div>
           <span>
-            <span className="block text-sm font-semibold leading-none text-ink">99</span>
-            <span className="mt-1 block text-[10px] leading-none text-faint">Lighthouse avg.</span>
+            <span className="block text-sm font-semibold leading-none text-ink">Agentic AI</span>
+            <span className="mt-1 block text-[10px] leading-none text-faint">LangChain &amp; MCP</span>
           </span>
         </div>
       </Reveal>
@@ -150,7 +150,7 @@ export default function Hero() {
             <p className="mt-7 flex flex-wrap items-center gap-2.5 text-[13px] text-muted">
               <span className="h-px w-7 bg-accent/70" aria-hidden="true" />
               Hi, I’m <span className="font-semibold text-ink">{profile.name}</span>
-              <span className="text-faint">— designer &amp; developer</span>
+              <span className="text-faint">— {profile.role}</span>
             </p>
           </Reveal>
 

@@ -23,7 +23,7 @@ export default function Contact() {
               <span className="font-serif font-normal italic text-accent">remembering.</span>
             </>
           }
-          description="I’m booking a small number of projects for early 2027. Whether it’s a full product build or a focused design sprint, I’d love to hear what you’re working on."
+          description="I’m open to full-time engineering roles, AI and full-stack opportunities, and technical collaborations. Feel free to reach out directly or send a message."
         />
 
         <div className="mt-14 grid gap-12 lg:mt-20 lg:grid-cols-12 lg:gap-16">
@@ -79,6 +79,26 @@ export default function Contact() {
                     </p>
                   </div>
                 </div>
+                {profile.phone && (
+                  <div className="flex items-start gap-3.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-faint">
+                      <Icon name="phone" size={15} />
+                    </span>
+                    <div>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+                        Phone
+                      </p>
+                      <p className="mt-1 text-[13px] text-ink">
+                        <a
+                          href={`tel:${profile.phone}`}
+                          className="transition-colors hover:text-accent"
+                        >
+                          {profile.phone}
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start gap-3.5">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-faint">
                     <Icon name="clock" size={15} />

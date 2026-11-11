@@ -5,10 +5,10 @@ import Reveal from './ui/Reveal'
 import SectionHeading from './ui/SectionHeading'
 
 const atAGlance = [
-  { icon: 'map-pin', label: 'Based in', value: 'Toronto, Canada' },
-  { icon: 'clock', label: 'Experience', value: '6+ years' },
-  { icon: 'layers', label: 'Focus', value: 'Product & web' },
-  { icon: 'mail', label: 'Response time', value: 'Within 24 hours' },
+  { icon: 'map-pin', label: 'Based in', value: 'Punjab, India' },
+  { icon: 'clock', label: 'Degree', value: 'B.Tech CSE (2026)' },
+  { icon: 'layers', label: 'Focus', value: 'AI, ML & Full-Stack' },
+  { icon: 'mail', label: 'Email', value: 'ravjotsg03@gmail.com' },
 ]
 
 export default function About() {
@@ -20,8 +20,8 @@ export default function About() {
           eyebrow="About"
           title={
             <>
-              A designer’s eye, an engineer’s{' '}
-              <span className="font-serif font-normal italic text-accent">mindset.</span>
+              Intelligent systems, robust{' '}
+              <span className="font-serif font-normal italic text-accent">engineering.</span>
             </>
           }
         />
@@ -47,7 +47,7 @@ export default function About() {
                 <span className="font-serif text-3xl italic text-ink">Ravjot</span>
                 <span className="h-px w-10 bg-line" aria-hidden="true" />
                 <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-faint">
-                  Designer · Developer · Toronto
+                  AI · Full-Stack · Punjab
                 </span>
               </div>
             </Reveal>
