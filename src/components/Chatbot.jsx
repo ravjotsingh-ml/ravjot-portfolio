@@ -120,11 +120,18 @@ export default function Chatbot() {
         { role: 'assistant', content: response.message.content },
       ])
     } catch (error) {
+      const isNetworkError =
+        error.message?.includes('NetworkError') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('fetch')
+      const message = isNetworkError
+        ? "Sorry, I couldn't connect to the backend server. It may still be waking up from cold start or connecting. Please try again in a moment, or contact Ravjot directly at ravjotsg03@gmail.com."
+        : `Sorry, I couldn't reach the assistant. ${error.message}`
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
-          content: `Sorry, I couldn't reach the assistant. ${error.message}`,
+          content: message,
           error: true,
         },
       ])
