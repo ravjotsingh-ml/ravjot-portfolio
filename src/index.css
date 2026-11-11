@@ -1,0 +1,212 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, Cambria, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-night: #08090a;
+  --color-surface: #0c0e10;
+  --color-ink: #f2f3ee;
+  --color-muted: #989ea3;
+  --color-faint: #7a8086;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-accent: #d9ff43;
+  --color-accent-dim: #b9de2e;
+
+  --animate-marquee: marquee 42s linear infinite;
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-float-slow: float 12s ease-in-out infinite;
+  --animate-spin-slow: spin 22s linear infinite;
+  --animate-fade-in: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-14px);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01" on, "cv11" on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: #08090a;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  section[id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+
+  img,
+  svg {
+    display: block;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #08090a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2e31;
+    border-radius: 999px;
+    border: 2px solid #08090a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3d4247;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .grain {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  .bg-grid-sm {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  .marquee-track {
+    animation: var(--animate-marquee);
+  }
+
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line);
+    background-color: rgb(255 255 255 / 0.025);
+    padding: 0.85rem 1rem;
+    color: var(--color-ink);
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .field::placeholder {
+    color: var(--color-faint);
+  }
+
+  .field:hover {
+    border-color: rgb(255 255 255 / 0.16);
+  }
+
+  .field:focus {
+    outline: none;
+    border-color: rgb(217 255 67 / 0.65);
+    background-color: rgb(255 255 255 / 0.04);
+    box-shadow: 0 0 0 4px rgb(217 255 67 / 0.08);
+  }
+
+  .field[aria-invalid="true"] {
+    border-color: rgb(248 113 113 / 0.65);
+  }
+
+  .field[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 4px rgb(248 113 113 / 0.1);
+  }
+}
