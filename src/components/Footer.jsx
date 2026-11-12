@@ -62,7 +62,7 @@ export default function Footer() {
           <nav className="md:col-span-3" aria-label="Footer">
             <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-faint">Navigate</p>
             <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5 md:grid-cols-1">
-              {[{ id: 'home', label: 'Home' }, ...navLinks].map((link) => (
+              {navLinks.map((link) => (
                 <li key={link.id}>
                   <a
                     href={`#${link.id}`}
