@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import About from './components/About'
+import AdminPanel from './components/AdminPanel'
 import Chatbot from './components/Chatbot'
 import Contact from './components/Contact'
 import Experience from './components/Experience'
@@ -11,6 +13,40 @@ import ScrollProgress from './components/ScrollProgress'
 import Skills from './components/Skills'
 
 export default function App() {
+  const [adminOpen, setAdminOpen] = useState(() => {
+    return typeof window !== 'undefined' && window.location.hash === '#admin'
+  })
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        setAdminOpen(true)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      // Shortcut: Ctrl + Shift + A (or Cmd + Shift + A) to open Admin Portal
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === 'A' || event.key === 'a')) {
+        event.preventDefault()
+        setAdminOpen((prev) => !prev)
+      }
+    }
+
+    window.addEventListener('hashchange', handleHash)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('hashchange', handleHash)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  const handleCloseAdmin = () => {
+    setAdminOpen(false)
+    if (window.location.hash === '#admin') {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }
+
   return (
     <>
       <a
@@ -34,9 +70,11 @@ export default function App() {
         <Contact />
       </main>
 
-      <Footer />
+      <Footer onOpenAdmin={() => setAdminOpen(true)} />
 
       <Chatbot />
+
+      <AdminPanel isOpen={adminOpen} onClose={handleCloseAdmin} />
     </>
   )
 }

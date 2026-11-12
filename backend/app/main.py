@@ -30,7 +30,9 @@ from .schemas import (
     ChatRequest,
     ChatResponse,
     ContactCreate,
+    ContactDetailOut,
     ContactOut,
+    ConversationSummaryOut,
     EducationOut,
     ExperienceOut,
     HealthResponse,
@@ -291,3 +293,77 @@ def start_chat(db: Session = Depends(get_db)):
     db.commit()
     db.refresh(conversation)
     return {"conversation_id": conversation.id, "title": conversation.title}
+
+
+# --- Admin Endpoints ----------------------------------------------------
+
+@app.get("/api/admin/contacts", response_model=list[ContactDetailOut], tags=["admin"])
+def list_admin_contacts(db: Session = Depends(get_db)):
+    """List all contact inquiries ordered newest first."""
+    return db.query(ContactMessage).order_by(ContactMessage.created_at.desc()).all()
+
+
+@app.patch("/api/admin/contacts/{contact_id}/read", response_model=ContactDetailOut, tags=["admin"])
+def toggle_contact_read(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.get(ContactMessage, contact_id)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact message not found.")
+    contact.read = not contact.read
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@app.delete("/api/admin/contacts/{contact_id}", tags=["admin"])
+def delete_contact(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.get(ContactMessage, contact_id)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact message not found.")
+    db.delete(contact)
+    db.commit()
+    return {"status": "deleted", "id": contact_id}
+
+
+@app.get("/api/admin/conversations", response_model=list[ConversationSummaryOut], tags=["admin"])
+def list_admin_conversations(db: Session = Depends(get_db)):
+    """List all conversations that have at least one message."""
+    conversations = (
+        db.query(ChatConversation)
+        .order_by(ChatConversation.updated_at.desc(), ChatConversation.id.desc())
+        .all()
+    )
+    result = []
+    for conv in conversations:
+        messages = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.conversation_id == conv.id)
+            .order_by(ChatMessage.id.asc())
+            .all()
+        )
+        if not messages:
+            continue
+        first_user_msg = next((m.content for m in messages if m.role == "user"), None)
+        title = first_user_msg[:50] + ("..." if len(first_user_msg) > 50 else "") if first_user_msg else f"Chat #{conv.id}"
+        result.append(
+            ConversationSummaryOut(
+                id=conv.id,
+                title=title,
+                created_at=conv.created_at,
+                updated_at=conv.updated_at or conv.created_at,
+                message_count=len(messages),
+                preview=first_user_msg or (messages[-1].content[:60] if messages else ""),
+            )
+        )
+    return result
+
+
+@app.delete("/api/admin/conversations/{conversation_id}", tags=["admin"])
+def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
+    conv = db.get(ChatConversation, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    db.query(ChatMessage).filter(ChatMessage.conversation_id == conversation_id).delete()
+    db.delete(conv)
+    db.commit()
+    return {"status": "deleted", "id": conversation_id}
+

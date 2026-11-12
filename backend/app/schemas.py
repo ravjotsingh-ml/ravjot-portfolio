@@ -128,6 +128,29 @@ class ContactOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ContactDetailOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    project: Optional[str] = None
+    message: str
+    read: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationSummaryOut(BaseModel):
+    id: int
+    title: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0
+    preview: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 # --- Chat ---
 
 class ChatRequest(BaseModel):

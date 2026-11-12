@@ -27,7 +27,7 @@ function LocalTime() {
   )
 }
 
-export default function Footer() {
+export default function Footer({ onOpenAdmin }) {
   return (
     <footer className="relative border-t border-line">
       <div className="mx-auto w-full max-w-7xl px-5 py-12 sm:px-8 sm:py-16 lg:px-10">
@@ -102,6 +102,17 @@ export default function Footer() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <p className="text-[11px] text-faint">Built with React, Vite &amp; Tailwind CSS</p>
             <LocalTime />
+            {onOpenAdmin && (
+              <button
+                type="button"
+                onClick={onOpenAdmin}
+                className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-faint transition-colors hover:text-accent"
+                title="Open Admin Conversation Portal"
+              >
+                <span className="h-1 w-1 rounded-full bg-accent/70" aria-hidden="true" />
+                Admin Portal
+              </button>
+            )}
             <a
               href="#home"
               className="group inline-flex items-center gap-2 text-[11px] text-muted transition-colors hover:text-accent"

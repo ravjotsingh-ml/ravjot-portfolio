@@ -54,4 +54,15 @@ export const api = {
   },
 
   startChat: () => request('/api/chat/start', { method: 'POST' }),
+
+  // --- Admin API ---
+  getAdminContacts: () => request('/api/admin/contacts'),
+  toggleContactRead: (id) => request(`/api/admin/contacts/${id}/read`, { method: 'PATCH' }),
+  deleteContact: (id) => request(`/api/admin/contacts/${id}`, { method: 'DELETE' }),
+  getAdminConversations: () => request('/api/admin/conversations'),
+  getAdminConversation: async (id) => {
+    const data = await request(`/api/chat/history/${id}`)
+    return data.messages
+  },
+  deleteConversation: (id) => request(`/api/admin/conversations/${id}`, { method: 'DELETE' }),
 }
