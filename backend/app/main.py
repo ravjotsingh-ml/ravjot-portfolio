@@ -100,6 +100,7 @@ def startup() -> None:
 
 # --- Health -------------------------------------------------------------
 
+@app.get("/health", response_model=HealthResponse, tags=["health"])
 @app.get("/api/health", response_model=HealthResponse, tags=["health"])
 def health(db: Session = Depends(get_db)):
     try:
