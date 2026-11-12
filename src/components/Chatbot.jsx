@@ -44,6 +44,7 @@ export default function Chatbot() {
           const historyMessages = history.map((item) => ({
             role: item.role,
             content: item.content,
+            sender_name: item.sender_name || null,
           }))
           setMessages([welcome, ...historyMessages])
           setIsReady(true)
@@ -67,6 +68,38 @@ export default function Chatbot() {
 
     initialise()
   }, [isOpen, conversationId])
+
+  // Poll for live replies from Support / Admin when open
+  useEffect(() => {
+    if (!isOpen || isMinimized || !conversationId) return
+
+    const interval = setInterval(async () => {
+      try {
+        const history = await api.getChatHistory(conversationId)
+        if (!history || history.length === 0) return
+
+        const welcome = { role: 'assistant', content: WELCOME_MESSAGE }
+        const historyMessages = history.map((item) => ({
+          role: item.role,
+          content: item.content,
+          sender_name: item.sender_name || null,
+        }))
+
+        // Only update if count has changed
+        setMessages((prev) => {
+          const nonWelcomePrev = prev.filter((m) => m.content !== WELCOME_MESSAGE && !m.error)
+          if (nonWelcomePrev.length !== historyMessages.length) {
+            return [welcome, ...historyMessages]
+          }
+          return prev
+        })
+      } catch {
+        // Silently ignore polling network errors
+      }
+    }, 3500)
+
+    return () => clearInterval(interval)
+  }, [isOpen, isMinimized, conversationId])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -227,24 +260,35 @@ export default function Chatbot() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {messages.map((message, index) => {
+              const isSupport = Boolean(message.sender_name)
+              return (
                 <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                    message.role === 'user'
-                      ? 'rounded-br-sm bg-accent text-[#08090a]'
-                      : message.error
-                        ? 'rounded-bl-sm border border-red-400/25 bg-red-400/[0.08] text-red-200'
-                        : 'rounded-bl-sm border border-white/[0.08] bg-white/[0.04] text-ink/90'
-                  }`}
+                  key={index}
+                  className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
-                  {message.content}
+                  {isSupport && (
+                    <span className="mb-1 ml-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-accent font-semibold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                      {message.sender_name}
+                    </span>
+                  )}
+                  <div
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                      message.role === 'user'
+                        ? 'rounded-br-sm bg-accent text-[#08090a]'
+                        : message.error
+                          ? 'rounded-bl-sm border border-red-400/25 bg-red-400/[0.08] text-red-200'
+                          : isSupport
+                            ? 'rounded-bl-sm border border-accent/40 bg-accent/[0.08] text-white shadow-[0_2px_15px_rgba(217,255,67,0.08)]'
+                            : 'rounded-bl-sm border border-white/[0.08] bg-white/[0.04] text-ink/90'
+                    }`}
+                  >
+                    {message.content}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             {isTyping && (
               <div className="flex justify-start">

@@ -151,16 +151,50 @@ class ConversationSummaryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# --- Admin Auth ---
+# --- Admin Auth & Team ---
 
 class AdminLoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
+    email: Optional[str] = None
 
 
 class AdminLoginResponse(BaseModel):
     authenticated: bool
     token: str
     user: str
+    role: str = "master"  # "master" | "support"
+    email: Optional[str] = None
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminUserCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    email: str = Field(..., min_length=5, max_length=120)
+    password: str = Field(..., min_length=4, max_length=100)
+    role: Optional[str] = "support"  # "master" | "support"
+
+
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class AdminChatReplyRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+    sender_name: Optional[str] = None
 
 
 # --- Chat ---
@@ -174,6 +208,7 @@ class ChatMessageOut(BaseModel):
     id: int
     conversation_id: int
     role: str
+    sender_name: Optional[str] = None
     content: str
     created_at: datetime
 

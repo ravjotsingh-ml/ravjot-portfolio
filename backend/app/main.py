@@ -1,8 +1,16 @@
 """FastAPI application for the portfolio backend."""
 
+import base64
+from datetime import datetime
+import hashlib
+import hmac
+import json
 import logging
+import os
+import time
+from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -12,6 +20,7 @@ from .chatbot import ChatbotError, generate_reply
 from .core.config import settings
 from .database import Base, SessionLocal, engine, get_db
 from .models import (
+    AdminUser,
     Award,
     ChatConversation,
     ChatMessage,
@@ -24,8 +33,12 @@ from .models import (
     SkillItem,
 )
 from .schemas import (
+    AdminChatReplyRequest,
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminUserCreate,
+    AdminUserOut,
+    AdminUserUpdate,
     AwardOut,
     ChatHistoryResponse,
     ChatMessageOut,
@@ -85,14 +98,87 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     )
 
 
+# --- Security & Auth Helpers ------------------------------------------
+
+def hash_password(password: str) -> str:
+    salt = os.urandom(16).hex()
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+    return f"{salt}${hashed}"
+
+
+def verify_password(password: str, hashed_value: str) -> bool:
+    if not hashed_value or "$" not in hashed_value:
+        return False
+    salt, hashed = hashed_value.split("$", 1)
+    test_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+    return hmac.compare_digest(hashed, test_hash)
+
+
+def create_admin_token(user_id: int, role: str, email: str, name: str) -> str:
+    payload = {
+        "uid": user_id,
+        "role": role,
+        "email": email,
+        "name": name,
+        "exp": int(time.time()) + 86400 * 7,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    b64 = base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+    sig = hmac.new(settings.SECRET_KEY.encode("utf-8"), b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{b64}.{sig}"
+
+
+def verify_admin_token(token: Optional[str]) -> Optional[dict]:
+    if not token:
+        return None
+    token = token.replace("Bearer ", "").strip()
+    if token == settings.SECRET_KEY or token == settings.ADMIN_PASSWORD:
+        return {"uid": 0, "role": "master", "name": "Ravjot Singh", "email": "ravjotsg03@gmail.com"}
+    parts = token.split(".")
+    if len(parts) != 2:
+        return None
+    b64, sig = parts
+    expected = hmac.new(settings.SECRET_KEY.encode("utf-8"), b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    try:
+        pad = len(b64) % 4
+        if pad:
+            b64 += "=" * (4 - pad)
+        raw = base64.urlsafe_b64decode(b64.encode("utf-8")).decode("utf-8")
+        payload = json.loads(raw)
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+
 # --- Startup ------------------------------------------------------------
 
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR;"))
+    except Exception as exc:
+        logger.warning("Could not run sender_name column migration: %s", exc)
+
     db = SessionLocal()
     try:
         seed_database(db)
+        master = db.query(AdminUser).filter(AdminUser.role == "master").first()
+        if not master:
+            master = AdminUser(
+                name="Ravjot Singh",
+                email="ravjotsg03@gmail.com",
+                password_hash=hash_password(settings.ADMIN_PASSWORD),
+                role="master",
+                is_active=True,
+            )
+            db.add(master)
+            db.commit()
     finally:
         db.close()
     logger.info("API started. CORS origins: %s", settings.BACKEND_CORS_ORIGINS)
@@ -301,14 +387,62 @@ def start_chat(db: Session = Depends(get_db)):
 # --- Admin Endpoints ----------------------------------------------------
 
 @app.post("/api/admin/login", response_model=AdminLoginResponse, tags=["admin"])
-def admin_login(payload: AdminLoginRequest):
-    if payload.password.strip() == settings.ADMIN_PASSWORD:
+def admin_login(payload: AdminLoginRequest, db: Session = Depends(get_db)):
+    pwd = payload.password.strip()
+
+    # 1. Master password instant bypass (when no email is provided)
+    if pwd == settings.ADMIN_PASSWORD and not payload.email:
+        token = create_admin_token(0, "master", "ravjotsg03@gmail.com", "Ravjot Singh")
         return AdminLoginResponse(
             authenticated=True,
-            token=settings.SECRET_KEY,
+            token=token,
             user="Ravjot Singh",
+            role="master",
+            email="ravjotsg03@gmail.com",
         )
-    raise HTTPException(status_code=401, detail="Incorrect admin password.")
+
+    # 2. Email + password authentication (for Support Team or Master Admin)
+    if payload.email:
+        email = payload.email.strip().lower()
+        user = db.query(AdminUser).filter(AdminUser.email == email).first()
+
+        # Check default master fallback
+        if not user and email == "ravjotsg03@gmail.com" and pwd == settings.ADMIN_PASSWORD:
+            token = create_admin_token(0, "master", "ravjotsg03@gmail.com", "Ravjot Singh")
+            return AdminLoginResponse(
+                authenticated=True,
+                token=token,
+                user="Ravjot Singh",
+                role="master",
+                email="ravjotsg03@gmail.com",
+            )
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Your account has been deactivated. Please contact the master administrator.",
+            )
+
+        password_matches = (
+            verify_password(pwd, user.password_hash)
+            or (user.role == "master" and pwd == settings.ADMIN_PASSWORD)
+        )
+        if not password_matches:
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        token = create_admin_token(user.id, user.role, user.email, user.name)
+        return AdminLoginResponse(
+            authenticated=True,
+            token=token,
+            user=user.name,
+            role=user.role,
+            email=user.email,
+        )
+
+    raise HTTPException(status_code=401, detail="Incorrect admin credentials.")
 
 
 @app.get("/api/admin/contacts", response_model=list[ContactDetailOut], tags=["admin"])
@@ -371,6 +505,43 @@ def list_admin_conversations(db: Session = Depends(get_db)):
     return result
 
 
+@app.get("/api/admin/conversations/{conversation_id}", response_model=list[ChatMessageOut], tags=["admin"])
+def get_admin_conversation_messages(conversation_id: int, db: Session = Depends(get_db)):
+    """Fetch all messages for an individual conversation thread."""
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.conversation_id == conversation_id)
+        .order_by(ChatMessage.id.asc())
+        .all()
+    )
+    return messages
+
+
+@app.post("/api/admin/conversations/{conversation_id}/reply", response_model=ChatMessageOut, tags=["admin"])
+def reply_to_conversation(
+    conversation_id: int,
+    payload: AdminChatReplyRequest,
+    db: Session = Depends(get_db),
+):
+    """Admin or support agent reply directly into a user conversation."""
+    conv = db.get(ChatConversation, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    sender = payload.sender_name or "Support Team"
+    reply_msg = ChatMessage(
+        conversation_id=conversation_id,
+        role="assistant",
+        sender_name=sender,
+        content=payload.content.strip(),
+    )
+    db.add(reply_msg)
+    conv.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(reply_msg)
+    return reply_msg
+
+
 @app.delete("/api/admin/conversations/{conversation_id}", tags=["admin"])
 def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
     conv = db.get(ChatConversation, conversation_id)
@@ -380,4 +551,71 @@ def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
     db.delete(conv)
     db.commit()
     return {"status": "deleted", "id": conversation_id}
+
+
+# --- Team Management (Master Admin) -------------------------------------
+
+@app.get("/api/admin/team", response_model=list[AdminUserOut], tags=["admin"])
+def list_team_members(db: Session = Depends(get_db)):
+    """List all team members (Master and Support admins)."""
+    return db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
+
+
+@app.post("/api/admin/team", response_model=AdminUserOut, status_code=201, tags=["admin"])
+def create_team_member(payload: AdminUserCreate, db: Session = Depends(get_db)):
+    """Master Admin adds a new support agent or admin."""
+    email = payload.email.strip().lower()
+    existing = db.query(AdminUser).filter(AdminUser.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An admin with this email already exists.")
+
+    new_user = AdminUser(
+        name=payload.name.strip(),
+        email=email,
+        password_hash=hash_password(payload.password.strip()),
+        role=payload.role or "support",
+        is_active=True,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@app.patch("/api/admin/team/{user_id}", response_model=AdminUserOut, tags=["admin"])
+def update_team_member(user_id: int, payload: AdminUserUpdate, db: Session = Depends(get_db)):
+    """Update team member details, role, status, or password."""
+    user = db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+
+    if payload.name is not None:
+        user.name = payload.name.strip()
+    if payload.email is not None:
+        user.email = payload.email.strip().lower()
+    if payload.role is not None:
+        user.role = payload.role
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.password:
+        user.password_hash = hash_password(payload.password.strip())
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.delete("/api/admin/team/{user_id}", tags=["admin"])
+def delete_team_member(user_id: int, db: Session = Depends(get_db)):
+    """Delete a support team member (cannot delete master admin)."""
+    user = db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Team member not found.")
+    if user.role == "master":
+        raise HTTPException(status_code=400, detail="Cannot delete master admin account.")
+
+    db.delete(user)
+    db.commit()
+    return {"status": "deleted", "id": user_id}
+
 

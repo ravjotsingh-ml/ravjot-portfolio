@@ -125,8 +125,23 @@ class ChatMessage(Base):
 
     id = Column(Integer, primary_key=True)
     conversation_id = Column(Integer, nullable=False, index=True)
-    role = Column(String, nullable=False)  # "user" | "assistant"
+    role = Column(String, nullable=False)  # "user" | "assistant" | "support"
+    sender_name = Column(String, nullable=True)  # e.g. "Ravjot Singh (Master)", "Support Agent"
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (Index("ix_chat_messages_conversation_id", "conversation_id"),)
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="support")  # "master" | "support"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

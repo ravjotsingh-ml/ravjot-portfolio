@@ -56,10 +56,13 @@ export const api = {
   startChat: () => request('/api/chat/start', { method: 'POST' }),
 
   // --- Admin API ---
-  adminLogin: (password) =>
+  adminLogin: ({ password, email } = {}) =>
     request('/api/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({
+        password,
+        ...(email ? { email: email.trim() } : {}),
+      }),
     }),
   getAdminContacts: () => request('/api/admin/contacts'),
   toggleContactRead: (id) => request(`/api/admin/contacts/${id}/read`, { method: 'PATCH' }),
@@ -69,5 +72,27 @@ export const api = {
     const data = await request(`/api/chat/history/${id}`)
     return data.messages
   },
+  sendAdminChatReply: (conversationId, content, senderName) =>
+    request(`/api/admin/conversations/${conversationId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content,
+        sender_name: senderName || null,
+      }),
+    }),
   deleteConversation: (id) => request(`/api/admin/conversations/${id}`, { method: 'DELETE' }),
+
+  // --- Team Management (Master Admin) ---
+  getTeamMembers: () => request('/api/admin/team'),
+  createTeamMember: (payload) =>
+    request('/api/admin/team', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateTeamMember: (id, payload) =>
+    request(`/api/admin/team/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteTeamMember: (id) => request(`/api/admin/team/${id}`, { method: 'DELETE' }),
 }
