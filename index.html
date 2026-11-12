@@ -12,19 +12,113 @@
     <meta property="og:title" content="Ravjot Singh — AI &amp; Full-Stack Engineer" />
     <meta
       property="og:description"
-      content="Computer Science Engineering graduate skilled in Python, FastAPI, Django, Agentic AI, and Machine Learning."
+      content="Computer Science Engineering graduate skilled in Python, FastAPI, Django, PostgreSQL, Agentic AI, and Machine Learning."
     />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Fonts load without blocking the first paint; the splash screen covers
+         the swap so the landing page never flashes unstyled text. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600;700;800&display=swap"
+      />
+    </noscript>
+    <style>
+      /* Static splash: painted before any JavaScript runs. React replaces it
+         with the real preloader on mount, so there is never a white flash. */
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: #08090a;
+        color: #f2f3ee;
+        font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+      }
+      #boot-splash .mark {
+        display: grid;
+        place-items: center;
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(217, 255, 67, 0.35);
+        background: rgba(217, 255, 67, 0.08);
+        color: #d9ff43;
+        font-family: 'Instrument Serif', Georgia, serif;
+        font-style: italic;
+        font-size: 1.25rem;
+        animation: boot-pulse 1.8s ease-in-out infinite;
+      }
+      #boot-splash .label {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 0.5625rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: #7a8086;
+      }
+      #boot-splash .bar {
+        width: 9rem;
+        height: 2px;
+        overflow: hidden;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      #boot-splash .bar span {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 9999px;
+        background: #d9ff43;
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.06);
+          opacity: 0.75;
+        }
+      }
+      @keyframes boot-slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(250%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .mark,
+        #boot-splash .bar span {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-splash" role="status" aria-live="polite">
+        <div class="mark">rs</div>
+        <div class="label">Ravjot Singh — Portfolio</div>
+        <div class="bar"><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

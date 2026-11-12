@@ -42,7 +42,10 @@ const COUNTRIES = [
   { code: 'OTHER', label: 'Other country', dial: '', min: 6, max: 14 },
 ]
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+// Mirrors the backend pattern exactly: no consecutive dots, no leading or
+// trailing dot in the local part, real looking domain and TLD.
+const emailPattern =
+  /^[A-Za-z0-9](?:[A-Za-z0-9._%+-]*[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$/
 
 function digitsOnly(value) {
   return (value || '').replace(/\D/g, '')
@@ -124,6 +127,13 @@ export default function ContactForm({ onUnlocked, accessStatus, lead }) {
   const country = countryFor(countryCode)
   const isUnlocked = accessStatus === 'unlocked'
   const unlockedFirstName = (lead?.full_name || '').split(' ')[0]
+
+  // Live verification of the two fields that gate the assistant.
+  const emailValue = values.email.trim()
+  const emailVerified = emailPattern.test(emailValue)
+  const phoneVerified = validateField('phone', values, country) === '' && values.phone.trim() !== ''
+  const nameVerified = values.fullName.trim().length >= 2
+  const canUnlock = nameVerified && emailVerified && phoneVerified
 
   useEffect(() => {
     if (status === 'success') successRef.current?.focus()
@@ -336,26 +346,38 @@ export default function ContactForm({ onUnlocked, accessStatus, lead }) {
             >
               Email address <span className="text-accent">*</span>
             </label>
-            <input
-              id="contact-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              placeholder="you@company.com"
-              value={values.email}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              required
-              maxLength={200}
-              aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? 'contact-email-error' : undefined}
-              className="field"
-            />
+            <div className="relative">
+              <input
+                id="contact-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                placeholder="you@company.com"
+                value={values.email}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                required
+                maxLength={200}
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'contact-email-error' : undefined}
+                className={`field pr-11 ${emailVerified ? 'border-accent/50' : ''}`}
+              />
+              {emailVerified ? (
+                <span
+                  className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-accent"
+                  aria-hidden="true"
+                >
+                  <Icon name="circle-check" size={16} strokeWidth={1.5} />
+                </span>
+              ) : null}
+            </div>
             {errors.email ? (
               <p id="contact-email-error" className="mt-1.5 text-[11px] text-red-400">
                 {errors.email}
               </p>
+            ) : emailVerified ? (
+              <p className="mt-1.5 text-[11px] text-accent/80">Email verified.</p>
             ) : null}
           </div>
         </div>
@@ -388,26 +410,40 @@ export default function ContactForm({ onUnlocked, accessStatus, lead }) {
                 className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint"
               />
             </div>
-            <input
-              id="contact-phone"
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-              inputMode="tel"
-              placeholder={country.code === 'OTHER' ? '+44 7700 900123' : '98765 43210'}
-              value={values.phone}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              required
-              maxLength={24}
-              aria-invalid={Boolean(errors.phone)}
-              aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
-              className="field min-w-0 flex-1"
-            />
+            <div className="relative min-w-0 flex-1">
+              <input
+                id="contact-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder={country.code === 'OTHER' ? '+44 7700 900123' : '98765 43210'}
+                value={values.phone}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                required
+                maxLength={24}
+                aria-invalid={Boolean(errors.phone)}
+                aria-describedby={errors.phone ? 'contact-phone-error' : undefined}
+                className={`field pr-11 ${phoneVerified ? 'border-accent/50' : ''}`}
+              />
+              {phoneVerified ? (
+                <span
+                  className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-accent"
+                  aria-hidden="true"
+                >
+                  <Icon name="circle-check" size={16} strokeWidth={1.5} />
+                </span>
+              ) : null}
+            </div>
           </div>
           {errors.phone ? (
             <p id="contact-phone-error" className="mt-1.5 text-[11px] text-red-400">
               {errors.phone}
+            </p>
+          ) : phoneVerified ? (
+            <p className="mt-1.5 text-[11px] text-accent/80">
+              Phone verified — the assistant will unlock once you submit.
             </p>
           ) : null}
         </div>
@@ -484,7 +520,12 @@ export default function ContactForm({ onUnlocked, accessStatus, lead }) {
           </p>
           <Button
             type="submit"
-            disabled={status === 'sending'}
+            disabled={status === 'sending' || !canUnlock}
+            title={
+              canUnlock
+                ? undefined
+                : 'Enter your full name, a valid email address and a valid phone number to unlock the assistant'
+            }
             className="w-full sm:w-auto"
             aria-busy={status === 'sending'}
           >
@@ -504,6 +545,17 @@ export default function ContactForm({ onUnlocked, accessStatus, lead }) {
             )}
           </Button>
         </div>
+
+        <p className="mt-3 flex items-center gap-2 text-[10px] text-faint">
+          <Icon
+            name={canUnlock ? 'unlock' : 'lock'}
+            size={12}
+            className={canUnlock ? 'text-accent' : undefined}
+          />
+          {canUnlock
+            ? 'Your details are verified — submitting unlocks the AI assistant.'
+            : 'The AI assistant unlocks once your email address and phone number are verified.'}
+        </p>
       </form>
     </div>
   )

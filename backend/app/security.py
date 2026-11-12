@@ -38,8 +38,12 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_lead_session(db: Session, lead: Lead) -> tuple[str, LeadSession]:
-    """Issue a fresh session token for a lead and persist its hash."""
+def create_lead_session(db: Session, lead: Lead, commit: bool = True) -> tuple[str, LeadSession]:
+    """Issue a fresh session token for a lead and persist its hash.
+
+    ``commit=False`` lets the caller store the lead and the session in a single
+    transaction, which keeps the contact request fast.
+    """
     token = generate_token()
     session = LeadSession(
         lead_id=lead.id,
@@ -48,8 +52,11 @@ def create_lead_session(db: Session, lead: Lead) -> tuple[str, LeadSession]:
         + timedelta(hours=max(1, settings.CHAT_SESSION_HOURS)),
     )
     db.add(session)
-    db.commit()
-    db.refresh(session)
+    if commit:
+        db.commit()
+        db.refresh(session)
+    else:
+        db.flush()
     return token, session
 
 

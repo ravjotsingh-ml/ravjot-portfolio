@@ -196,11 +196,20 @@ export default function Chatbot({ accessStatus, lead, openSignal, onSessionExpir
   }, [isOpen, closeChat])
 
   const goToContactForm = useCallback(() => {
+    // Scrolling to the field itself (instead of the section) forces the
+    // deferred section to render first, so the visitor lands on the form.
+    const field = document.getElementById('contact-name')
     const section = document.getElementById('contact')
-    section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+    if (field) {
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } else {
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+
     window.setTimeout(() => {
       document.getElementById('contact-name')?.focus({ preventScroll: true })
-    }, 600)
+    }, 700)
   }, [])
 
   const handleChatError = (error) => {

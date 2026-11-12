@@ -291,12 +291,26 @@ def get_awards(db: Session = Depends(get_db)):
 
 # --- Contact / Lead capture ---------------------------------------------
 
-def normalise_phone(raw: str) -> str:
-    """Return an E.164-style phone number or raise a 422.
+# Real country calling codes, used to verify that the submitted number really
+# carries a country code and not just a random string of digits.
+COUNTRY_CALLING_CODES = {
+    1, 7, 20, 27, 30, 31, 32, 33, 34, 36, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49,
+    51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64, 65, 66, 81, 82, 84, 86,
+    90, 91, 92, 93, 94, 95, 98, 212, 213, 216, 218, 220, 233, 234, 254, 255, 256,
+    260, 263, 351, 352, 353, 354, 355, 356, 357, 358, 359, 370, 371, 372, 380,
+    381, 385, 386, 387, 389, 420, 421, 500, 501, 502, 503, 504, 505, 506, 507,
+    509, 590, 591, 592, 593, 595, 597, 598, 599, 670, 672, 673, 674, 675, 676,
+    677, 678, 679, 680, 681, 682, 683, 685, 686, 687, 688, 689, 690, 691, 692,
+    850, 852, 853, 855, 856, 880, 886, 960, 961, 962, 963, 964, 965, 966, 967,
+    968, 970, 971, 972, 973, 974, 975, 976, 977, 992, 993, 994, 995, 996, 998,
+}
 
-    Accepts country codes, spaces, dashes, dots and parentheses, then enforces
-    the E.164 shape (``+`` followed by 8–15 digits) without pulling in a heavy
-    phone metadata dependency.
+
+def normalise_phone(raw: str) -> str:
+    """Return an E.164 phone number or raise a 422.
+
+    The number must carry a real country calling code and a plausible
+    national length. Spaces, dashes, dots and parentheses are accepted.
     """
     cleaned = re.sub(r"[^\d+]", "", (raw or "").strip())
     if cleaned.startswith("00"):
@@ -309,12 +323,28 @@ def normalise_phone(raw: str) -> str:
         )
 
     digits = cleaned[1:]
-    if len(set(digits)) == 1:
+    national = digits
+    calling_code = None
+    for length in (3, 2, 1):
+        candidate = int(digits[:length])
+        if candidate in COUNTRY_CALLING_CODES:
+            calling_code = candidate
+            national = digits[length:]
+            break
+
+    if calling_code is None:
+        raise HTTPException(
+            status_code=422,
+            detail="That country code does not look right. Please check your phone number.",
+        )
+
+    if not 4 <= len(national) <= 14:
         raise HTTPException(
             status_code=422,
             detail="Please enter a valid phone number including your country code.",
         )
-    if digits in {"123456789", "1234567890", "0123456789"}:
+
+    if len(set(national)) == 1 or national in {"123456789", "1234567890", "0123456789"}:
         raise HTTPException(
             status_code=422,
             detail="Please enter a valid phone number including your country code.",
@@ -366,7 +396,7 @@ def create_contact(payload: ContactCreate, request: Request, db: Session = Depen
     ip = client_ip(request)
     allowed, retry_after = limiter.check(
         f"contact:ip:{ip}",
-        settings.CONTACT_RATE_LIMIT,
+        settings.CONTACT_IP_RATE_LIMIT,
         settings.CONTACT_RATE_WINDOW_SECONDS,
     )
     if not allowed:
@@ -415,6 +445,10 @@ def create_contact(payload: ContactCreate, request: Request, db: Session = Depen
         )
         db.add(lead)
         try:
+            # The lead and its session are written in a single transaction so
+            # the visitor gets their token in one round trip.
+            db.flush()
+            token, session = create_lead_session(db, lead, commit=False)
             db.commit()
         except Exception:
             db.rollback()
@@ -424,6 +458,7 @@ def create_contact(payload: ContactCreate, request: Request, db: Session = Depen
                 detail="Could not save your details. Please try again.",
             )
         db.refresh(lead)
+        db.refresh(session)
         logger.info("New lead captured: id=%s", lead.id)
     else:
         # Keep the latest name/message useful for follow-up, but never create
@@ -438,7 +473,17 @@ def create_contact(payload: ContactCreate, request: Request, db: Session = Depen
         if changed:
             db.commit()
 
-    token, session = create_lead_session(db, lead)
+        token, session = create_lead_session(db, lead)
+
+    # Owner notifications and analytics run in the background so the response
+    # is not delayed by SMTP or third-party calls.
+    try:
+        from .tasks import dispatch_lead_notification
+
+        dispatched = dispatch_lead_notification(lead.id)
+        logger.info("Lead %s queued for background processing: %s", lead.id, dispatched)
+    except Exception:  # noqa: BLE001 - Celery is optional
+        logger.warning("Background processing unavailable for lead %s", lead.id)
 
     return ContactCreatedOut(
         lead_id=lead.id,

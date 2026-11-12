@@ -83,6 +83,38 @@
     scroll-margin-top: 5.5rem;
   }
 
+  /* Off-screen sections are not painted until they are approached, which
+     removes most of the first-paint work on slower devices. The intrinsic
+     sizes match the real section heights so anchor links land accurately. */
+  section[id] {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1200px;
+  }
+
+  #home {
+    contain-intrinsic-size: auto 1364px;
+  }
+
+  #about {
+    contain-intrinsic-size: auto 2416px;
+  }
+
+  #skills {
+    contain-intrinsic-size: auto 1643px;
+  }
+
+  #work {
+    contain-intrinsic-size: auto 2976px;
+  }
+
+  #experience {
+    contain-intrinsic-size: auto 2027px;
+  }
+
+  #contact {
+    contain-intrinsic-size: auto 1735px;
+  }
+
   input,
   textarea,
   select,
@@ -146,8 +178,7 @@
     inset: 0;
     z-index: 80;
     pointer-events: none;
-    opacity: 0.035;
-    mix-blend-mode: soft-light;
+    opacity: 0.03;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-size: 180px 180px;
   }

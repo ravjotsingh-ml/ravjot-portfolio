@@ -3,9 +3,23 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-EMAIL_PATTERN = r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$"
+# A deliberately strict address format: no consecutive dots, no leading or
+# trailing dot in the local part, and a real looking domain and TLD.
+EMAIL_PATTERN = (
+    r"^[A-Za-z0-9](?:[A-Za-z0-9._%+-]*[A-Za-z0-9])?"
+    r"@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*"
+    r"\.[A-Za-z]{2,24}$"
+)
+
+
+def normalise_email(value: Any) -> Any:
+    """Trim and lower-case an address so duplicates are detected reliably."""
+    if isinstance(value, str):
+        return value.strip().lower()
+    return value
 
 
 # --- Portfolio ---
@@ -120,6 +134,18 @@ class ContactCreate(BaseModel):
 
     # Honeypot: real browsers never fill this hidden field.
     website: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _clean_email(cls, value: Any) -> Any:
+        return normalise_email(value)
+
+    @field_validator("full_name", "phone_number", mode="before")
+    @classmethod
+    def _clean_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 class ContactCreatedOut(BaseModel):

@@ -15,9 +15,18 @@ Gemini-powered AI chatbot.
 - Dark, editorial portfolio design with smooth scroll-reveal animations
 - Hero, About, Skills, Projects, Experience and Contact sections
 - Interactive project cards with case-study modals
+- **Fast first paint**
+  - Static splash screen painted from `index.html` before any JavaScript runs
+  - A React preloader holds the screen until the app, the webfonts and every
+    asset are ready — the landing page is never revealed half-loaded
+  - The admin console (~40 kB) is code-split and only fetched when it opens
+  - Webfonts load without blocking the first paint
+  - Below-the-fold sections are rendered on demand with accurate intrinsic sizes
 - **Lead capture first** — the contact form is the only way into the AI assistant
   - Full name, email and phone (country code) required, message optional
-  - Client-side validation plus authoritative server-side validation
+  - Live verification for the email and phone fields; the submit button stays
+    locked until all three required fields are valid
+  - The same validation runs again on the server — the browser is never trusted
   - Honeypot field, per-IP and per-email rate limiting, duplicate detection
   - Clear privacy notice about how the data is stored and used
 - **Gated Gemini chatbot** (bottom-right) that unlocks after a successful submission
@@ -26,6 +35,8 @@ Gemini-powered AI chatbot.
   - Suggested questions, message bubbles, typing indicator, auto-scroll
   - Minimize / close, smooth open & close animations, responsive mobile layout
   - Conversations and messages persisted in PostgreSQL and linked to the lead
+- **Celery worker** handles lead notifications and other background work, so
+  the contact request returns immediately
 - Admin portal lists captured leads (email, phone, message) and live chats
 - GitHub, X / Twitter and LinkedIn links in the Hero, Contact and Footer
 - Accessible markup, keyboard support and reduced-motion handling
@@ -60,6 +71,15 @@ Gemini-powered AI chatbot.
 ```
 
 ## Getting started
+
+### 0. Everything at once
+
+```bash
+./dev.sh
+```
+
+This starts the FastAPI backend (`:8000`), the Celery worker and the Vite
+frontend (`:5173`) together and stops them again with `Ctrl + C`.
 
 ### 1. Frontend
 
@@ -102,6 +122,32 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 API docs: `http://localhost:8000/api/docs`
+
+### 4. Celery worker (background processing)
+
+Lead submissions are stored synchronously, but everything that happens
+afterwards — owner notifications, analytics — runs in a Celery worker so the
+API never blocks on SMTP or third-party calls.
+
+```bash
+cd backend
+celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+```
+
+The default broker is a local SQLite file, so nothing extra has to be installed
+for development. In production point it at Redis:
+
+```bash
+CELERY_BROKER_URL=redis://default:<password>@<host>:6379/0
+CELERY_RESULT_BACKEND=redis://default:<password>@<host>:6379/1
+```
+
+If no broker or worker is reachable the API still works — the task is executed
+inline as a fallback. On Railway, deploy the `worker` process type from
+`backend/Procfile` alongside the `web` service.
+
+Add `LEAD_NOTIFICATION_EMAIL` and the `SMTP_*` variables to receive an email for
+every new enquiry; without them the notification is written to the worker log.
 
 ### 4. Gemini API key (required for the chatbot)
 
@@ -174,12 +220,26 @@ Extra environment variables (all optional, see `backend/.env.example`):
 
 ```bash
 CHAT_SESSION_HOURS=168            # how long an unlocked chat stays valid
-CONTACT_RATE_LIMIT=5              # submissions allowed per window, per IP and per email
+CONTACT_RATE_LIMIT=5              # submissions allowed per window, per email
+CONTACT_IP_RATE_LIMIT=15          # submissions allowed per window, per IP
 CONTACT_RATE_WINDOW_SECONDS=900
 CONVERSATION_RATE_LIMIT=20        # chat messages allowed per window, per session
 CONVERSATION_RATE_WINDOW_SECONDS=300
 DUPLICATE_LEAD_WINDOW_HOURS=24    # repeat submissions reuse the existing lead
 ```
+
+### Field verification
+
+The email and phone number are verified twice — in the browser for instant
+feedback and again on the server, which is the only check that counts:
+
+| Field   | Browser                                             | Backend                                                          |
+| ------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| Email   | strict address pattern, live “verified” tick         | Pydantic pattern, lower-cased, rejects `..`, bad domains and TLDs |
+| Phone   | country-code selector + national length check        | normalised to E.164, real calling code, 4–14 national digits      |
+
+A chat session token is only issued when **both** fields pass the server-side
+checks, so the assistant can never be unlocked with an invalid address.
 
 ## Testing
 

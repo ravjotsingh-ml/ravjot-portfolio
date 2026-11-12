@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import About from './components/About'
-import AdminPanel from './components/AdminPanel'
 import Chatbot from './components/Chatbot'
 import Contact from './components/Contact'
 import Experience from './components/Experience'
@@ -13,6 +12,10 @@ import ScrollProgress from './components/ScrollProgress'
 import Skills from './components/Skills'
 import { api, setChatToken } from './lib/api'
 import { clearStoredToken, readStoredToken, storeToken } from './lib/leadSession'
+
+// The admin console is ~65 kB of code and is only needed by the site owner,
+// so it is split out of the initial bundle.
+const AdminPanel = lazy(() => import('./components/AdminPanel'))
 
 export default function App() {
   const [adminOpen, setAdminOpen] = useState(() => {
@@ -81,6 +84,29 @@ export default function App() {
     setChatAccess({ status: 'locked', lead: null })
   }, [])
 
+  // Sections below the fold are rendered on demand, so a plain anchor jump
+  // can land on a placeholder. Re-aligning once the section has rendered
+  // keeps every in-page link accurate.
+  useEffect(() => {
+    const handleAnchorClick = (event) => {
+      const anchor = event.target.closest?.('a[href^="#"]')
+      if (!anchor) return
+
+      const id = anchor.getAttribute('href')?.slice(1)
+      if (!id) return
+
+      const target = document.getElementById(id)
+      if (!target) return
+
+      window.setTimeout(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 120)
+    }
+
+    document.addEventListener('click', handleAnchorClick)
+    return () => document.removeEventListener('click', handleAnchorClick)
+  }, [])
+
   useEffect(() => {
     const handleHash = () => {
       if (window.location.hash === '#admin') {
@@ -147,7 +173,11 @@ export default function App() {
         onSessionExpired={handleSessionExpired}
       />
 
-      <AdminPanel isOpen={adminOpen} onClose={handleCloseAdmin} />
+      {adminOpen && (
+        <Suspense fallback={null}>
+          <AdminPanel isOpen={adminOpen} onClose={handleCloseAdmin} />
+        </Suspense>
+      )}
     </>
   )
 }
