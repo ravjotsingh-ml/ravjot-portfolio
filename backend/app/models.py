@@ -111,10 +111,43 @@ class ContactMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Lead(Base):
+    """A visitor who submitted the contact form and unlocked the chatbot."""
+
+    __tablename__ = "leads"
+
+    id = Column(Integer, primary_key=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, nullable=False, index=True)
+    phone_number = Column(String, nullable=False, default="")
+    message = Column(Text, nullable=True)
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class LeadSession(Base):
+    """Server-side proof that a lead completed the contact form.
+
+    Only the SHA-256 hash of the bearer token is stored, so a database leak
+    cannot be used to hijack active chat sessions.
+    """
+
+    __tablename__ = "lead_sessions"
+
+    id = Column(Integer, primary_key=True)
+    lead_id = Column(Integer, nullable=False, index=True)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    revoked = Column(Boolean, default=False)
+
+
 class ChatConversation(Base):
     __tablename__ = "chat_conversations"
 
     id = Column(Integer, primary_key=True)
+    lead_id = Column(Integer, nullable=True, index=True)
     title = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

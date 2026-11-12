@@ -4,7 +4,7 @@ import Icon from './ui/Icon'
 import Reveal from './ui/Reveal'
 import SectionHeading from './ui/SectionHeading'
 
-export default function Contact() {
+export default function Contact({ accessStatus, lead, onUnlocked }) {
   return (
     <section id="contact" className="relative overflow-hidden py-24 sm:py-32">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
@@ -146,7 +146,11 @@ export default function Contact() {
           </div>
 
           <Reveal delay={120} className="lg:col-span-7">
-            <ContactForm />
+            <ContactForm
+              accessStatus={accessStatus}
+              lead={lead}
+              onUnlocked={onUnlocked}
+            />
           </Reveal>
         </div>
       </div>

@@ -1187,11 +1187,11 @@ export default function AdminPanel({ isOpen, onClose }) {
 
                   {/* Inquiry Body */}
                   <div className="flex-1 p-5 sm:p-8 space-y-6">
-                    <div className="grid gap-3 sm:grid-cols-2 rounded-2xl border border-white/10 bg-[#0e1013] p-4">
+                    <div className="grid gap-3 sm:grid-cols-3 rounded-2xl border border-white/10 bg-[#0e1013] p-4">
                       <div>
                         <span className="font-mono text-[10px] uppercase text-faint">Email</span>
                         <div className="mt-1 flex items-center gap-2">
-                          <p className="font-mono text-[13px] text-white select-all">
+                          <p className="font-mono text-[13px] text-white select-all break-all">
                             {selectedContact.email}
                           </p>
                           <button
@@ -1204,6 +1204,23 @@ export default function AdminPanel({ isOpen, onClose }) {
                           {copied && (
                             <span className="font-mono text-[10px] text-accent">Copied!</span>
                           )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-mono text-[10px] uppercase text-faint">Phone</span>
+                        <div className="mt-1 flex items-center gap-2">
+                          <p className="font-mono text-[13px] text-white select-all break-all">
+                            {selectedContact.phone_number || '—'}
+                          </p>
+                          {selectedContact.phone_number ? (
+                            <a
+                              href={`tel:${selectedContact.phone_number}`}
+                              className="text-faint hover:text-accent"
+                              aria-label="Call lead"
+                            >
+                              <Icon name="phone" size={13} />
+                            </a>
+                          ) : null}
                         </div>
                       </div>
                       <div>
@@ -1221,7 +1238,7 @@ export default function AdminPanel({ isOpen, onClose }) {
                         Message Content
                       </h4>
                       <div className="rounded-2xl border border-white/10 bg-[#0c0e11] p-5 text-[14px] leading-relaxed text-ink/90 whitespace-pre-wrap">
-                        {selectedContact.message}
+                        {selectedContact.message || 'No message provided.'}
                       </div>
                     </div>
 

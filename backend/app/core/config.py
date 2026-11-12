@@ -44,5 +44,15 @@ class Settings:
         if origin.strip()
     ]
 
+    # Lead capture / chat access
+    CHAT_SESSION_HOURS: int = int(os.getenv("CHAT_SESSION_HOURS", "168"))
+    CONTACT_RATE_LIMIT: int = int(os.getenv("CONTACT_RATE_LIMIT", "5"))
+    CONTACT_RATE_WINDOW_SECONDS: int = int(os.getenv("CONTACT_RATE_WINDOW_SECONDS", "900"))
+    CONVERSATION_RATE_LIMIT: int = int(os.getenv("CONVERSATION_RATE_LIMIT", "20"))
+    CONVERSATION_RATE_WINDOW_SECONDS: int = int(
+        os.getenv("CONVERSATION_RATE_WINDOW_SECONDS", "300")
+    )
+    DUPLICATE_LEAD_WINDOW_HOURS: int = int(os.getenv("DUPLICATE_LEAD_WINDOW_HOURS", "24"))
+
 
 settings = Settings()

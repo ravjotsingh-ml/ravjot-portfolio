@@ -15,12 +15,18 @@ Gemini-powered AI chatbot.
 - Dark, editorial portfolio design with smooth scroll-reveal animations
 - Hero, About, Skills, Projects, Experience and Contact sections
 - Interactive project cards with case-study modals
-- Floating Gemini AI chatbot (bottom-right) with:
-  - Welcome message and suggested questions
-  - Typing indicator, message bubbles, minimize/close
-  - Conversation history persisted in PostgreSQL
-  - Responsive mobile layout
-- Contact form that stores messages in PostgreSQL
+- **Lead capture first** — the contact form is the only way into the AI assistant
+  - Full name, email and phone (country code) required, message optional
+  - Client-side validation plus authoritative server-side validation
+  - Honeypot field, per-IP and per-email rate limiting, duplicate detection
+  - Clear privacy notice about how the data is stored and used
+- **Gated Gemini chatbot** (bottom-right) that unlocks after a successful submission
+  - Server-issued session token; the launcher stays locked until then
+  - Welcome message personalised with the visitor's name
+  - Suggested questions, message bubbles, typing indicator, auto-scroll
+  - Minimize / close, smooth open & close animations, responsive mobile layout
+  - Conversations and messages persisted in PostgreSQL and linked to the lead
+- Admin portal lists captured leads (email, phone, message) and live chats
 - GitHub, X / Twitter and LinkedIn links in the Hero, Contact and Footer
 - Accessible markup, keyboard support and reduced-motion handling
 
@@ -33,7 +39,8 @@ Gemini-powered AI chatbot.
 │   │   ├── ui/                 # Button, Icon, Reveal, SectionHeading
 │   │   └── ...
 │   ├── data/portfolio.js       # All editable content + social URLs
-│   ├── lib/api.js              # Frontend API client
+│   ├── lib/api.js              # Frontend API client (sends the chat session token)
+│   ├── lib/leadSession.js      # Local cache for the server-issued chat token
 │   └── App.jsx
 └── backend/
     ├── app/
@@ -41,11 +48,14 @@ Gemini-powered AI chatbot.
     │   ├── models.py           # SQLAlchemy models
     │   ├── schemas.py          # Pydantic request/response schemas
     │   ├── chatbot.py          # Gemini integration
+    │   ├── security.py         # Session tokens + rate limiting
     │   ├── seed.py             # Default portfolio content
     │   ├── database.py         # Engine + session
     │   └── core/config.py      # Environment configuration
     ├── migrations/             # Alembic migrations
     ├── alembic.ini
+    ├── check_gemini.py         # Backend-side Gemini connectivity check
+    ├── check_lead_flow.py      # End-to-end lead capture + gated chat check
     └── requirements.txt
 ```
 
@@ -102,7 +112,7 @@ The chatbot will not answer until a key is configured.
 
    ```bash
    GEMINI_API_KEY=your-key-here
-   GEMINI_MODEL=gemini-2.0-flash
+   GEMINI_MODEL=gemini-3.5-flash-lite
    ```
 
 3. Restart the backend.
@@ -111,11 +121,16 @@ The key is read only by the backend and is never sent to the browser or written
 to logs. If the key is missing, the chatbot returns a clear configuration
 message instead of inventing an answer.
 
-Test the endpoint directly:
+Test the endpoint directly (a chat token is required — see below):
 
 ```bash
+curl -X POST http://localhost:8000/api/contact \
+  -H "Content-Type: application/json" \
+  -d '{"full_name":"Test Visitor","email":"visitor@example.com","phone_number":"+919876543210"}'
+
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
+  -H "X-Chat-Token: <session_token from the response above>" \
   -d '{"message":"What are Ravjot’s technical skills?"}'
 ```
 
@@ -137,10 +152,50 @@ python3 check_gemini.py
 | GET    | `/api/experience`                     | Professional experience        |
 | GET    | `/api/education`                      | Education                      |
 | GET    | `/api/awards`                         | Awards                         |
-| POST   | `/api/contact`                        | Store a contact message        |
+| POST   | `/api/contact`                        | Capture a lead, unlock the chat |
+| GET    | `/api/lead/session`                   | Validate a stored chat token   |
 | POST   | `/api/chat`                           | Send a chat message to Gemini  |
 | GET    | `/api/chat/history/{conversation_id}` | Conversation history           |
-| POST   | `/api/chat/start`                     | Create a new conversation      |
+| POST   | `/api/chat/start`                     | Create or reuse a conversation |
+
+### Lead capture and chat access
+
+`POST /api/contact` validates the payload with Pydantic, normalises the phone
+number to E.164, stores the lead in PostgreSQL and returns an opaque session
+token. Only the SHA-256 hash of that token is persisted, so a database leak can
+never be used to hijack a live chat.
+
+The frontend keeps the token in `localStorage` purely as a cache — the backend
+re-validates it on every page load through `GET /api/lead/session`, and every
+chat request must carry it in the `X-Chat-Token` header. A conversation can
+only be read or continued by the lead that owns it.
+
+Extra environment variables (all optional, see `backend/.env.example`):
+
+```bash
+CHAT_SESSION_HOURS=168            # how long an unlocked chat stays valid
+CONTACT_RATE_LIMIT=5              # submissions allowed per window, per IP and per email
+CONTACT_RATE_WINDOW_SECONDS=900
+CONVERSATION_RATE_LIMIT=20        # chat messages allowed per window, per session
+CONVERSATION_RATE_WINDOW_SECONDS=300
+DUPLICATE_LEAD_WINDOW_HOURS=24    # repeat submissions reuse the existing lead
+```
+
+## Testing
+
+With the backend running, the full lead capture + gated chatbot flow can be
+verified end to end against the real API and database:
+
+```bash
+cd backend
+python3 check_lead_flow.py
+```
+
+It checks that the chat is locked without a session, that invalid email/phone
+payloads are rejected, that the honeypot blocks bots, that a valid submission
+creates a lead and issues a token, that duplicates reuse the same lead, that
+Gemini answers, that history is stored, and that a second visitor cannot read
+or continue the first visitor's conversation.
 
 ## Social links
 
@@ -162,6 +217,9 @@ alembic upgrade head
 ## Notes
 
 - Never commit `.env` files or real API keys.
+- Visitor emails and phone numbers are never sent to the Gemini model and are
+  never returned to another visitor. The admin portal is the only place lead
+  contact details are visible.
 - The backend allows CORS from `http://localhost:5173` by default; configure
   `BACKEND_CORS_ORIGINS` for production.
 - The portfolio content is seeded automatically on first startup and can be

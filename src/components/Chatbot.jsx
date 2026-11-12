@@ -1,105 +1,152 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import Icon from './ui/Icon'
-
-const WELCOME_MESSAGE =
-  "Hi! I'm Ravjot's AI & live assistant. Ask me anything about his skills, projects, or experience, or send a message directly to Ravjot and his support team!"
 
 const SUGGESTED_QUESTIONS = [
   'Tell me about Ravjot.',
   'What technical skills does he have?',
-  'Explain his projects.',
+  'Explain his Agentic AI and ML work.',
   'What is his professional experience?',
   'How can I hire or contact him?',
 ]
 
-const STORAGE_KEY = 'ravjot_chat_conversation_id'
+function firstNameOf(fullName) {
+  return (fullName || '').trim().split(/\s+/)[0] || 'there'
+}
 
-export default function Chatbot() {
+function welcomeFor(fullName) {
+  return {
+    role: 'assistant',
+    content: `Hi ${firstNameOf(fullName)}! Thanks for connecting with me. I'm Ravjot's AI assistant. Feel free to ask me anything about his skills, projects, experience, or professional background.`,
+    welcome: true,
+  }
+}
+
+function toBubble(item) {
+  return {
+    role: item.role,
+    content: item.content,
+    sender_name: item.sender_name || null,
+  }
+}
+
+export default function Chatbot({ accessStatus, lead, openSignal, onSessionExpired }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [isReady, setIsReady] = useState(false)
-  const [conversationId, setConversationId] = useState(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    return stored ? Number(stored) : null
-  })
+  const [conversationId, setConversationId] = useState(lead?.conversation_id || null)
 
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
-  const didInitRef = useRef(false)
+  const closeTimerRef = useRef(null)
+  const accessRef = useRef(accessStatus)
+  const leadIdRef = useRef(lead?.lead_id || null)
+
+  const isUnlocked = accessStatus === 'unlocked'
 
   useEffect(() => {
-    if (!isOpen || didInitRef.current) return
-    didInitRef.current = true
+    accessRef.current = accessStatus
+  }, [accessStatus])
+
+  // --- Open automatically after a successful submission -----------------
+  useEffect(() => {
+    if (!openSignal) return
+    if (accessStatus !== 'unlocked') return
+    window.clearTimeout(closeTimerRef.current)
+    setIsClosing(false)
+    setIsMinimized(false)
+    setIsOpen(true)
+  }, [openSignal, accessStatus])
+
+  // --- Initialise (or restore) the conversation for this lead -----------
+  useEffect(() => {
+    const leadId = lead?.lead_id || null
+    if (!leadId) {
+      leadIdRef.current = null
+      setMessages([])
+      setConversationId(null)
+      setIsReady(false)
+      return undefined
+    }
+
+    if (leadIdRef.current === leadId && isReady) return undefined
+    leadIdRef.current = leadId
+
+    let cancelled = false
+    const welcome = welcomeFor(lead?.full_name)
 
     const initialise = async () => {
-      const welcome = { role: 'assistant', content: WELCOME_MESSAGE }
+      const restoreId = lead?.conversation_id || conversationId
 
-      if (conversationId) {
+      if (restoreId) {
         try {
-          const history = await api.getChatHistory(conversationId)
-          const historyMessages = history.map((item) => ({
-            role: item.role,
-            content: item.content,
-            sender_name: item.sender_name || null,
-          }))
-          setMessages([welcome, ...historyMessages])
+          const history = await api.getChatHistory(restoreId)
+          if (cancelled) return
+          setConversationId(restoreId)
+          setMessages([welcome, ...(history || []).map(toBubble)])
           setIsReady(true)
           return
-        } catch {
-          // Fall through to a fresh conversation.
+        } catch (error) {
+          if (cancelled) return
+          if (error.status === 401 || error.status === 403) {
+            onSessionExpired?.()
+            return
+          }
+          // Any other failure falls through to a fresh conversation.
         }
       }
 
       try {
         const conversation = await api.startChat()
+        if (cancelled) return
         setConversationId(conversation.conversation_id)
-        window.localStorage.setItem(STORAGE_KEY, String(conversation.conversation_id))
-      } catch {
-        // The chat still works without a persisted conversation.
+      } catch (error) {
+        if (cancelled) return
+        if (error.status === 401 || error.status === 403) {
+          onSessionExpired?.()
+          return
+        }
       }
 
-      setMessages((current) => (current.length ? current : [welcome]))
+      if (cancelled) return
+      setMessages([welcome])
       setIsReady(true)
     }
 
     initialise()
-  }, [isOpen, conversationId])
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.lead_id, accessStatus])
 
-  // Poll for live replies from Support / Admin when open
+  // --- Poll for live replies from the support team ----------------------
   useEffect(() => {
-    if (!isOpen || isMinimized || !conversationId) return
+    if (!isUnlocked || !isOpen || isMinimized || !conversationId) return undefined
 
     const interval = setInterval(async () => {
       try {
         const history = await api.getChatHistory(conversationId)
-        if (!history || history.length === 0) return
+        if (!history) return
 
-        const welcome = { role: 'assistant', content: WELCOME_MESSAGE }
-        const historyMessages = history.map((item) => ({
-          role: item.role,
-          content: item.content,
-          sender_name: item.sender_name || null,
-        }))
-
-        // Only update if count has changed
         setMessages((prev) => {
-          const nonWelcomePrev = prev.filter((m) => m.content !== WELCOME_MESSAGE && !m.error)
-          if (nonWelcomePrev.length !== historyMessages.length) {
-            return [welcome, ...historyMessages]
-          }
-          return prev
+          const previousCount = prev.filter((message) => !message.welcome && !message.error).length
+          if (previousCount === history.length) return prev
+          return [welcomeFor(lead?.full_name), ...history.map(toBubble)]
         })
-      } catch {
-        // Silently ignore polling network errors
+      } catch (error) {
+        if (error.status === 401 || error.status === 403) {
+          onSessionExpired?.()
+        }
       }
-    }, 3500)
+    }, 4000)
 
     return () => clearInterval(interval)
-  }, [isOpen, isMinimized, conversationId])
+  }, [isUnlocked, isOpen, isMinimized, conversationId, lead?.full_name, onSessionExpired])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -110,34 +157,84 @@ export default function Chatbot() {
     if (isOpen && !isMinimized) inputRef.current?.focus()
   }, [isOpen, isMinimized])
 
+  useEffect(
+    () => () => {
+      window.clearTimeout(closeTimerRef.current)
+    },
+    [],
+  )
+
+  const openChat = useCallback(() => {
+    window.clearTimeout(closeTimerRef.current)
+    setIsClosing(false)
+    setIsMinimized(false)
+    setIsOpen(true)
+  }, [])
+
+  const closeChat = useCallback(() => {
+    setIsClosing(true)
+    window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = window.setTimeout(() => {
+      setIsOpen(false)
+      setIsMinimized(false)
+      setIsClosing(false)
+    }, 200)
+  }, [])
+
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return undefined
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        setIsOpen(false)
-        setIsMinimized(false)
+        closeChat()
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isOpen])
+  }, [isOpen, closeChat])
 
-  const openChat = () => {
-    setIsOpen(true)
-    setIsMinimized(false)
-  }
+  const goToContactForm = useCallback(() => {
+    const section = document.getElementById('contact')
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.setTimeout(() => {
+      document.getElementById('contact-name')?.focus({ preventScroll: true })
+    }, 600)
+  }, [])
 
-  const closeChat = () => {
-    setIsOpen(false)
-    setIsMinimized(false)
+  const handleChatError = (error) => {
+    if (error.status === 401 || error.status === 403) {
+      onSessionExpired?.()
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content:
+            'Your chat session has expired. Please submit the contact form again to unlock the assistant.',
+          error: true,
+        },
+      ])
+      return
+    }
+
+    const isNetworkError =
+      error.message?.includes('Failed to fetch') || error.message?.includes('fetch')
+    const message = isNetworkError
+      ? `Sorry, I couldn't reach the assistant. Please check your connection and try again, or email Ravjot at ravjotsg03@gmail.com.`
+      : `Sorry, I couldn't reach the assistant. ${error.message}`
+
+    setMessages((current) => [...current, { role: 'assistant', content: message, error: true }])
   }
 
   const sendMessage = async (raw) => {
     const text = (raw ?? input).trim()
     if (!text || isTyping) return
+
+    if (!isUnlocked) {
+      goToContactForm()
+      return
+    }
 
     setMessages((current) => [...current, { role: 'user', content: text }])
     setInput('')
@@ -145,46 +242,63 @@ export default function Chatbot() {
 
     try {
       const response = await api.sendChatMessage(text, conversationId)
-      const nextConversationId = response.conversation_id
-      setConversationId(nextConversationId)
-      window.localStorage.setItem(STORAGE_KEY, String(nextConversationId))
-      setMessages((current) => [
-        ...current,
-        { role: 'assistant', content: response.message.content },
-      ])
+      setConversationId(response.conversation_id)
+      setMessages((current) => [...current, toBubble(response.message)])
     } catch (error) {
-      const isNetworkError =
-        error.message?.includes('NetworkError') ||
-        error.message?.includes('Failed to fetch') ||
-        error.message?.includes('fetch')
-      const message = isNetworkError
-        ? "Sorry, I couldn't connect to the backend server. It may still be waking up from cold start or connecting. Please try again in a moment, or contact Ravjot directly at ravjotsg03@gmail.com."
-        : `Sorry, I couldn't reach the assistant. ${error.message}`
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content: message,
-          error: true,
-        },
-      ])
+      handleChatError(error)
     } finally {
       setIsTyping(false)
     }
   }
 
-  const showSuggestions = isReady && messages.length <= 1 && !isTyping
+  // The greeting is rendered immediately, even while the conversation history
+  // is still being restored from the backend.
+  const visibleMessages = useMemo(() => {
+    if (messages.length) return messages
+    if (isUnlocked && lead?.full_name) return [welcomeFor(lead.full_name)]
+    return []
+  }, [messages, isUnlocked, lead?.full_name])
+
+  const showSuggestions = isReady && isUnlocked && visibleMessages.length <= 1 && !isTyping
+
+  // --- Checking a stored session on load: render nothing ----------------
+  if (accessStatus === 'checking') return null
 
   return (
     <>
+      {/* Locked launcher — visible proof the assistant needs a submission */}
+      {!isUnlocked && (
+        <button
+          type="button"
+          onClick={goToContactForm}
+          title="Submit the contact form to unlock the AI assistant"
+          className="group fixed bottom-5 right-5 z-[90] flex items-center gap-2.5 rounded-full border border-line bg-surface/90 py-2.5 pl-3.5 pr-4 text-muted shadow-[0_16px_50px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-all duration-300 hover:border-accent/40 hover:text-ink"
+        >
+          <span className="relative grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.04]">
+            <Icon name="lock" size={16} />
+          </span>
+          <span className="text-left leading-tight">
+            <span className="block text-[12px] font-semibold text-ink">AI chat locked</span>
+            <span className="block font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+              Unlock via contact form
+            </span>
+          </span>
+          <Icon
+            name="arrow-up"
+            size={13}
+            className="ml-0.5 rotate-45 text-faint transition-transform duration-300 group-hover:text-accent"
+          />
+        </button>
+      )}
+
       {/* Floating launcher */}
-      {!isOpen && (
+      {isUnlocked && !isOpen && (
         <button
           type="button"
           onClick={openChat}
           aria-label="Open AI chat"
           aria-expanded="false"
-          className="fixed bottom-5 right-5 z-[90] group flex h-14 w-14 items-center justify-center rounded-full bg-accent text-[#08090a] shadow-[0_12px_40px_-10px_rgba(217,255,67,0.65)] transition-all duration-300 hover:scale-105 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+          className="group fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-[#08090a] shadow-[0_12px_40px_-10px_rgba(217,255,67,0.65)] transition-all duration-300 hover:scale-105 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
         >
           <Icon
             name="sparkles"
@@ -199,7 +313,7 @@ export default function Chatbot() {
       )}
 
       {/* Minimized pill */}
-      {isOpen && isMinimized && (
+      {isUnlocked && isOpen && isMinimized && (
         <button
           type="button"
           onClick={openChat}
@@ -218,26 +332,27 @@ export default function Chatbot() {
       )}
 
       {/* Chat panel */}
-      {isOpen && !isMinimized && (
+      {isUnlocked && isOpen && !isMinimized && (
         <div
           id="ai-chat-panel"
           role="dialog"
           aria-modal="false"
           aria-label="Ravjot's AI assistant"
-          className="animate-fade-in fixed bottom-24 left-4 right-4 z-[90] flex h-[min(560px,calc(100dvh-8rem))] flex-col overflow-hidden rounded-2xl border border-line bg-surface/95 shadow-[0_40px_90px_-20px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:left-auto sm:right-5 sm:w-[380px]"
+          className={`chat-panel fixed bottom-24 left-4 right-4 z-[90] flex h-[min(560px,calc(100dvh-8rem))] flex-col overflow-hidden rounded-2xl border border-line bg-surface/95 shadow-[0_40px_90px_-20px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:left-auto sm:right-5 sm:w-[380px] ${
+            isClosing ? 'is-closing' : ''
+          }`}
         >
           {/* Header */}
           <div className="flex items-center gap-3 border-b border-line bg-white/[0.02] px-4 py-3.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent/25 bg-accent/10 font-serif text-[15px] italic text-accent">
+            <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent/25 bg-accent/10 font-serif text-[15px] italic text-accent">
               rs
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-accent" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold text-ink">
-                Ravjot · AI & Live Support
-              </p>
+              <p className="truncate text-[13px] font-semibold text-ink">Ravjot · AI Assistant</p>
               <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-faint">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-                Online · Live Team & Gemini AI
+                Online · Gemini AI · chatting as {firstNameOf(lead?.full_name)}
               </p>
             </div>
             <button
@@ -260,7 +375,7 @@ export default function Chatbot() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {messages.map((message, index) => {
+            {visibleMessages.map((message, index) => {
               const isSupport = Boolean(message.sender_name)
               return (
                 <div
@@ -268,8 +383,8 @@ export default function Chatbot() {
                   className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
                   {isSupport && (
-                    <span className="mb-1 ml-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-accent font-semibold">
-                      <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                    <span className="mb-1 ml-1 flex items-center gap-1 font-mono text-[9px] font-semibold uppercase tracking-wider text-accent">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
                       {message.sender_name}
                     </span>
                   )}

@@ -108,13 +108,38 @@ class AwardOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# --- Contact ---
+# --- Contact / Leads ---
 
 class ContactCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=120)
+    """Lead captured before the visitor can use the AI assistant."""
+
+    full_name: str = Field(..., min_length=2, max_length=120)
     email: str = Field(..., pattern=EMAIL_PATTERN, max_length=200)
-    project: Optional[str] = Field(default=None, max_length=120)
-    message: str = Field(..., min_length=10, max_length=5000)
+    phone_number: str = Field(..., min_length=6, max_length=32)
+    message: Optional[str] = Field(default=None, max_length=5000)
+
+    # Honeypot: real browsers never fill this hidden field.
+    website: Optional[str] = Field(default=None, max_length=200)
+
+
+class ContactCreatedOut(BaseModel):
+    """Returned after a successful submission. Never echoes PII back."""
+
+    lead_id: int
+    full_name: str
+    session_token: str
+    expires_at: datetime
+    chatbot_unlocked: bool = True
+    duplicate: bool = False
+    message: str
+
+
+class ChatSessionOut(BaseModel):
+    valid: bool
+    lead_id: Optional[int] = None
+    full_name: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    conversation_id: Optional[int] = None
 
 
 class ContactOut(BaseModel):
@@ -132,8 +157,9 @@ class ContactDetailOut(BaseModel):
     id: int
     name: str
     email: str
+    phone_number: Optional[str] = None
     project: Optional[str] = None
-    message: str
+    message: Optional[str] = None
     read: bool
     created_at: datetime
 

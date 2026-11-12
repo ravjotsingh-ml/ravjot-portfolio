@@ -1,12 +1,13 @@
 """FastAPI application for the portfolio backend."""
 
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import hmac
 import json
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -27,6 +28,8 @@ from .models import (
     ContactMessage,
     Education,
     Experience,
+    Lead,
+    LeadSession,
     PortfolioInfo,
     Project,
     SkillGroup,
@@ -44,9 +47,10 @@ from .schemas import (
     ChatMessageOut,
     ChatRequest,
     ChatResponse,
+    ChatSessionOut,
     ContactCreate,
+    ContactCreatedOut,
     ContactDetailOut,
-    ContactOut,
     ConversationSummaryOut,
     EducationOut,
     ExperienceOut,
@@ -55,6 +59,13 @@ from .schemas import (
     ProjectOut,
     SkillGroupOut,
     SkillItemOut,
+)
+from .security import (
+    client_ip,
+    create_lead_session,
+    limiter,
+    require_chat_session,
+    resolve_token,
 )
 from .seed import seed_database
 
@@ -162,8 +173,20 @@ def startup() -> None:
     try:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR;"))
+            conn.execute(text("ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS lead_id INTEGER;"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_chat_conversations_lead_id "
+                    "ON chat_conversations (lead_id);"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_leads_email ON leads (email);"
+                )
+            )
     except Exception as exc:
-        logger.warning("Could not run sender_name column migration: %s", exc)
+        logger.warning("Could not run inline column migration: %s", exc)
 
     db = SessionLocal()
     try:
@@ -266,34 +289,257 @@ def get_awards(db: Session = Depends(get_db)):
     return db.query(Award).order_by(Award.id.asc()).all()
 
 
-# --- Contact ------------------------------------------------------------
+# --- Contact / Lead capture ---------------------------------------------
 
-@app.post("/api/contact", response_model=ContactOut, status_code=201, tags=["contact"])
-def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
-    message = ContactMessage(
-        name=payload.name,
-        email=payload.email,
-        project=payload.project or "",
-        message=payload.message,
-    )
-    db.add(message)
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception("Failed to store contact message")
+def normalise_phone(raw: str) -> str:
+    """Return an E.164-style phone number or raise a 422.
+
+    Accepts country codes, spaces, dashes, dots and parentheses, then enforces
+    the E.164 shape (``+`` followed by 8–15 digits) without pulling in a heavy
+    phone metadata dependency.
+    """
+    cleaned = re.sub(r"[^\d+]", "", (raw or "").strip())
+    if cleaned.startswith("00"):
+        cleaned = "+" + cleaned[2:]
+
+    if not re.fullmatch(r"\+[1-9]\d{6,14}", cleaned):
         raise HTTPException(
-            status_code=500,
-            detail="Could not save your message. Please try again.",
+            status_code=422,
+            detail="Please enter a valid phone number including your country code.",
         )
-    db.refresh(message)
-    return message
+
+    digits = cleaned[1:]
+    if len(set(digits)) == 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Please enter a valid phone number including your country code.",
+        )
+    if digits in {"123456789", "1234567890", "0123456789"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Please enter a valid phone number including your country code.",
+        )
+
+    return cleaned
+
+
+def _lead_to_detail(lead: Lead) -> ContactDetailOut:
+    return ContactDetailOut(
+        id=lead.id,
+        name=lead.full_name,
+        email=lead.email,
+        phone_number=lead.phone_number,
+        project=None,
+        message=lead.message,
+        read=bool(lead.read),
+        created_at=lead.created_at,
+    )
+
+
+def _latest_conversation_id(db: Session, lead_id: int) -> Optional[int]:
+    conversation = (
+        db.query(ChatConversation)
+        .filter(ChatConversation.lead_id == lead_id)
+        .order_by(ChatConversation.id.desc())
+        .first()
+    )
+    return conversation.id if conversation else None
+
+
+@app.post(
+    "/api/contact",
+    response_model=ContactCreatedOut,
+    status_code=201,
+    tags=["contact"],
+)
+def create_contact(payload: ContactCreate, request: Request, db: Session = Depends(get_db)):
+    """Save a lead and issue the token that unlocks the AI assistant.
+
+    Validation happens here, not in the browser. Duplicate submissions from the
+    same email inside the configured window reuse the existing lead instead of
+    creating a second row, and every attempt is rate limited by IP and email.
+    """
+    # 1. Honeypot — hidden in the UI, so any value means an automated bot.
+    if (payload.website or "").strip():
+        raise HTTPException(status_code=400, detail="Submission rejected.")
+
+    ip = client_ip(request)
+    allowed, retry_after = limiter.check(
+        f"contact:ip:{ip}",
+        settings.CONTACT_RATE_LIMIT,
+        settings.CONTACT_RATE_WINDOW_SECONDS,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many submissions from this device. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    email = payload.email.strip().lower()
+    allowed, retry_after = limiter.check(
+        f"contact:email:{email}",
+        settings.CONTACT_RATE_LIMIT,
+        settings.CONTACT_RATE_WINDOW_SECONDS,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many submissions for this email address. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    full_name = " ".join(payload.full_name.split())
+    phone_number = normalise_phone(payload.phone_number)
+    message = (payload.message or "").strip() or None
+
+    # 2. Deduplicate recent submissions without revealing whether an address is
+    #    already on file. The visitor still gets a working chat session.
+    duplicate_since = datetime.utcnow() - timedelta(
+        hours=max(1, settings.DUPLICATE_LEAD_WINDOW_HOURS)
+    )
+    lead = (
+        db.query(Lead)
+        .filter(Lead.email == email, Lead.created_at >= duplicate_since)
+        .order_by(Lead.created_at.desc())
+        .first()
+    )
+    duplicate = lead is not None
+
+    if not duplicate:
+        lead = Lead(
+            full_name=full_name,
+            email=email,
+            phone_number=phone_number,
+            message=message,
+        )
+        db.add(lead)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to store lead")
+            raise HTTPException(
+                status_code=500,
+                detail="Could not save your details. Please try again.",
+            )
+        db.refresh(lead)
+        logger.info("New lead captured: id=%s", lead.id)
+    else:
+        # Keep the latest name/message useful for follow-up, but never create
+        # a duplicate row for the same enquiry.
+        changed = False
+        if full_name and lead.full_name != full_name:
+            lead.full_name = full_name
+            changed = True
+        if message and lead.message != message:
+            lead.message = message
+            changed = True
+        if changed:
+            db.commit()
+
+    token, session = create_lead_session(db, lead)
+
+    return ContactCreatedOut(
+        lead_id=lead.id,
+        full_name=lead.full_name,
+        session_token=token,
+        expires_at=session.expires_at,
+        chatbot_unlocked=True,
+        duplicate=duplicate,
+        message=(
+            "We already had your details on file, so we've unlocked the assistant "
+            "for you again."
+            if duplicate
+            else "Thanks for reaching out! Your details are saved."
+        ),
+    )
+
+
+@app.get("/api/lead/session", response_model=ChatSessionOut, tags=["contact"])
+def get_lead_session(
+    x_chat_token: Optional[str] = Header(default=None, alias="X-Chat-Token"),
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """Validate a stored chat token on page load.
+
+    This is the only proof the frontend trusts. If the token is missing,
+    expired or revoked, the chatbot stays locked. An invalid token is reported
+    as ``valid: false`` rather than an error, so a stale session never leaves
+    a console error behind on the visitor's page.
+    """
+    token = x_chat_token
+    if not token and authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:]
+
+    session = resolve_token(db, token)
+    if not session:
+        return ChatSessionOut(valid=False)
+
+    lead = db.get(Lead, session.lead_id)
+    if not lead:
+        return ChatSessionOut(valid=False)
+
+    return ChatSessionOut(
+        valid=True,
+        lead_id=lead.id,
+        full_name=lead.full_name,
+        expires_at=session.expires_at,
+        conversation_id=_latest_conversation_id(db, lead.id),
+    )
 
 
 # --- Chat ---------------------------------------------------------------
 
+def _conversation_for_lead(db: Session, lead_id: int) -> ChatConversation:
+    """Reuse the newest empty conversation, otherwise create a fresh one."""
+    conversation = (
+        db.query(ChatConversation)
+        .filter(ChatConversation.lead_id == lead_id)
+        .order_by(ChatConversation.id.desc())
+        .first()
+    )
+    if conversation:
+        has_messages = (
+            db.query(ChatMessage.id)
+            .filter(ChatMessage.conversation_id == conversation.id)
+            .first()
+        )
+        if not has_messages:
+            return conversation
+
+    conversation = ChatConversation(title="New conversation", lead_id=lead_id)
+    db.add(conversation)
+    db.flush()
+    return conversation
+
+
 @app.post("/api/chat", response_model=ChatResponse, tags=["chat"])
-def chat(payload: ChatRequest, db: Session = Depends(get_db)):
+def chat(
+    payload: ChatRequest,
+    session_data: tuple[LeadSession, Lead] = Depends(require_chat_session),
+    db: Session = Depends(get_db),
+):
+    """Send a message to the portfolio assistant.
+
+    Requires the token issued by ``POST /api/contact`` and only ever touches
+    conversations owned by that lead.
+    """
+    session, lead = session_data
+
+    allowed, retry_after = limiter.check(
+        f"chat:session:{session.id}",
+        settings.CONVERSATION_RATE_LIMIT,
+        settings.CONVERSATION_RATE_WINDOW_SECONDS,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="You're sending messages a little too quickly. Please wait a moment.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     message = payload.message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
@@ -301,12 +547,13 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     conversation_id = payload.conversation_id
     if conversation_id:
         conversation = db.get(ChatConversation, conversation_id)
-        if not conversation:
-            raise HTTPException(status_code=404, detail="Conversation not found.")
+        if not conversation or conversation.lead_id != lead.id:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
     else:
-        conversation = ChatConversation(title=message[:60])
-        db.add(conversation)
-        db.flush()
+        conversation = _conversation_for_lead(db, lead.id)
         conversation_id = conversation.id
 
     user_message = ChatMessage(
@@ -330,6 +577,7 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)):
         {"role": item.role, "content": item.content} for item in history[-12:]
     ]
 
+    conversation.updated_at = datetime.utcnow()
     db.commit()
 
     try:
@@ -343,6 +591,7 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)):
         content=reply,
     )
     db.add(assistant_message)
+    conversation.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(assistant_message)
 
@@ -357,9 +606,20 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     response_model=ChatHistoryResponse,
     tags=["chat"],
 )
-def chat_history(conversation_id: int, db: Session = Depends(get_db)):
+def chat_history(
+    conversation_id: int,
+    session_data: tuple[LeadSession, Lead] = Depends(require_chat_session),
+    db: Session = Depends(get_db),
+):
+    """Return messages for a conversation the caller owns.
+
+    A visitor can never read another visitor's conversation, even by guessing
+    sequential conversation ids.
+    """
+    _, lead = session_data
+
     conversation = db.get(ChatConversation, conversation_id)
-    if not conversation:
+    if not conversation or conversation.lead_id != lead.id:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
     messages = (
@@ -375,10 +635,13 @@ def chat_history(conversation_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/chat/start", tags=["chat"])
-def start_chat(db: Session = Depends(get_db)):
-    """Create an empty conversation and return its id."""
-    conversation = ChatConversation(title="New conversation")
-    db.add(conversation)
+def start_chat(
+    session_data: tuple[LeadSession, Lead] = Depends(require_chat_session),
+    db: Session = Depends(get_db),
+):
+    """Create (or reuse) an empty conversation bound to the current lead."""
+    _, lead = session_data
+    conversation = _conversation_for_lead(db, lead.id)
     db.commit()
     db.refresh(conversation)
     return {"conversation_id": conversation.id, "title": conversation.title}
@@ -447,26 +710,28 @@ def admin_login(payload: AdminLoginRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/admin/contacts", response_model=list[ContactDetailOut], tags=["admin"])
 def list_admin_contacts(db: Session = Depends(get_db)):
-    """List all contact inquiries ordered newest first."""
-    return db.query(ContactMessage).order_by(ContactMessage.created_at.desc()).all()
+    """List all captured leads ordered newest first (admin UI)."""
+    leads = db.query(Lead).order_by(Lead.created_at.desc()).all()
+    return [_lead_to_detail(lead) for lead in leads]
 
 
 @app.patch("/api/admin/contacts/{contact_id}/read", response_model=ContactDetailOut, tags=["admin"])
 def toggle_contact_read(contact_id: int, db: Session = Depends(get_db)):
-    contact = db.get(ContactMessage, contact_id)
+    contact = db.get(Lead, contact_id)
     if not contact:
-        raise HTTPException(status_code=404, detail="Contact message not found.")
+        raise HTTPException(status_code=404, detail="Lead not found.")
     contact.read = not contact.read
     db.commit()
     db.refresh(contact)
-    return contact
+    return _lead_to_detail(contact)
 
 
 @app.delete("/api/admin/contacts/{contact_id}", tags=["admin"])
 def delete_contact(contact_id: int, db: Session = Depends(get_db)):
-    contact = db.get(ContactMessage, contact_id)
+    contact = db.get(Lead, contact_id)
     if not contact:
-        raise HTTPException(status_code=404, detail="Contact message not found.")
+        raise HTTPException(status_code=404, detail="Lead not found.")
+    db.query(LeadSession).filter(LeadSession.lead_id == contact_id).delete()
     db.delete(contact)
     db.commit()
     return {"status": "deleted", "id": contact_id}

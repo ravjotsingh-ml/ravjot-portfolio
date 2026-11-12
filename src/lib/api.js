@@ -1,12 +1,26 @@
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
+const TOKEN_HEADER = 'X-Chat-Token'
+
+// Held in memory; the value itself is only ever a backend-issued opaque token.
+let chatToken = null
+
+export function setChatToken(token) {
+  chatToken = token || null
+}
+
 async function request(path, options = {}) {
+  const { headers: extraHeaders, ...rest } = options
+  const headers = {
+    Accept: 'application/json',
+    ...(rest.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(chatToken ? { [TOKEN_HEADER]: chatToken } : {}),
+    ...(extraHeaders || {}),
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      Accept: 'application/json',
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...options,
+    ...rest,
+    headers,
   })
 
   const data = await response.json().catch(() => null)
@@ -20,7 +34,9 @@ async function request(path, options = {}) {
         .map((item) => (item?.msg ? item.msg : 'Please check the form and try again.'))
         .join(' ')
     }
-    throw new Error(message)
+    const error = new Error(message)
+    error.status = response.status
+    throw error
   }
 
   return data
@@ -33,12 +49,16 @@ export const api = {
   getSkills: () => request('/api/skills'),
   getExperience: () => request('/api/experience'),
 
-  submitContact: (payload) =>
+  // --- Lead capture ---
+  submitLead: (payload) =>
     request('/api/contact', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
+  getLeadSession: () => request('/api/lead/session'),
+
+  // --- Chat (requires a lead session token) ---
   sendChatMessage: (message, conversationId) =>
     request('/api/chat', {
       method: 'POST',
@@ -68,10 +88,7 @@ export const api = {
   toggleContactRead: (id) => request(`/api/admin/contacts/${id}/read`, { method: 'PATCH' }),
   deleteContact: (id) => request(`/api/admin/contacts/${id}`, { method: 'DELETE' }),
   getAdminConversations: () => request('/api/admin/conversations'),
-  getAdminConversation: async (id) => {
-    const data = await request(`/api/chat/history/${id}`)
-    return data.messages
-  },
+  getAdminConversation: (id) => request(`/api/admin/conversations/${id}`),
   sendAdminChatReply: (conversationId, content, senderName) =>
     request(`/api/admin/conversations/${conversationId}/reply`, {
       method: 'POST',
