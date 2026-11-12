@@ -27,6 +27,7 @@ class Settings:
         "postgresql+psycopg2://postgres@127.0.0.1:5433/portfolio",
     )
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-change-me")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "ravjot2026").strip()
     DEBUG: bool = os.getenv("DEBUG", "True").lower() in {"1", "true", "yes"}
 
     # Gemini / Google AI

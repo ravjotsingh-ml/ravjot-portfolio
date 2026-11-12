@@ -56,6 +56,11 @@ export const api = {
   startChat: () => request('/api/chat/start', { method: 'POST' }),
 
   // --- Admin API ---
+  adminLogin: (password) =>
+    request('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
   getAdminContacts: () => request('/api/admin/contacts'),
   toggleContactRead: (id) => request(`/api/admin/contacts/${id}/read`, { method: 'PATCH' }),
   deleteContact: (id) => request(`/api/admin/contacts/${id}`, { method: 'DELETE' }),

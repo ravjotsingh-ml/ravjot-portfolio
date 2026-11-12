@@ -151,6 +151,18 @@ class ConversationSummaryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Admin Auth ---
+
+class AdminLoginRequest(BaseModel):
+    password: str = Field(..., min_length=1)
+
+
+class AdminLoginResponse(BaseModel):
+    authenticated: bool
+    token: str
+    user: str
+
+
 # --- Chat ---
 
 class ChatRequest(BaseModel):

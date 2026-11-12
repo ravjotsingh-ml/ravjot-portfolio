@@ -24,6 +24,8 @@ from .models import (
     SkillItem,
 )
 from .schemas import (
+    AdminLoginRequest,
+    AdminLoginResponse,
     AwardOut,
     ChatHistoryResponse,
     ChatMessageOut,
@@ -296,6 +298,17 @@ def start_chat(db: Session = Depends(get_db)):
 
 
 # --- Admin Endpoints ----------------------------------------------------
+
+@app.post("/api/admin/login", response_model=AdminLoginResponse, tags=["admin"])
+def admin_login(payload: AdminLoginRequest):
+    if payload.password.strip() == settings.ADMIN_PASSWORD:
+        return AdminLoginResponse(
+            authenticated=True,
+            token=settings.SECRET_KEY,
+            user="Ravjot Singh",
+        )
+    raise HTTPException(status_code=401, detail="Incorrect admin password.")
+
 
 @app.get("/api/admin/contacts", response_model=list[ContactDetailOut], tags=["admin"])
 def list_admin_contacts(db: Session = Depends(get_db)):

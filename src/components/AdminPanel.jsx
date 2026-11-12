@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import Icon from './ui/Icon'
 
+const ADMIN_STORAGE_KEY = 'ravjot_admin_token'
+
 function formatDate(isoString) {
   if (!isoString) return ''
   const date = new Date(isoString)
@@ -30,7 +32,170 @@ function timeAgo(isoString) {
   return formatDate(isoString)
 }
 
+function AdminLoginView({ onLoginSuccess, onClose }) {
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!password.trim()) {
+      setError('Please enter your admin password.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setError('')
+
+    try {
+      const res = await api.adminLogin(password.trim())
+      if (res?.authenticated && res?.token) {
+        sessionStorage.setItem(ADMIN_STORAGE_KEY, res.token)
+        onLoginSuccess()
+      } else {
+        setError('Authentication failed. Please try again.')
+      }
+    } catch (err) {
+      setError(err.message || 'Incorrect admin password. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="relative flex min-h-screen w-full items-center justify-center p-4 sm:p-6 overflow-hidden">
+      {/* Background glow and subtle grid */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        <div className="bg-grid absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
+        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.08] blur-[120px]" />
+        <div className="absolute right-1/4 bottom-1/4 h-80 w-80 rounded-full bg-[#4b6bff]/[0.05] blur-[100px]" />
+      </div>
+
+      <div className="relative w-full max-w-[420px] rounded-3xl border border-white/10 bg-[#0c0e11]/90 p-7 sm:p-9 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.95)] backdrop-blur-xl animate-fade-in">
+        {/* Floating badge */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.2em] text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+            Restricted Access
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Back to Portfolio"
+            className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.02] text-faint transition-colors hover:border-white/25 hover:text-white"
+          >
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+
+        {/* Brand circle */}
+        <div className="mt-8 flex items-center gap-4">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-gradient-to-br from-[#283218] via-[#141810] to-[#0c0e11] font-serif text-2xl italic text-accent shadow-inner">
+            rs
+          </span>
+          <div>
+            <h2 className="text-xl font-medium tracking-tight text-white">
+              Admin Portal
+            </h2>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
+              Ravjot Singh · Portfolio
+            </p>
+          </div>
+        </div>
+
+        {/* Welcome message */}
+        <div className="mt-6">
+          <h1 className="font-serif text-3xl italic tracking-tight text-ink sm:text-[2rem]">
+            Welcome back.
+          </h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">
+            Enter your admin key to view client inquiries, manage conversation threads, and send direct replies.
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+          <div>
+            <label
+              htmlFor="admin-password"
+              className="block font-mono text-[10px] uppercase tracking-[0.2em] text-faint"
+            >
+              Master Password
+            </label>
+            <div className="relative mt-2">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint">
+                <Icon name="lock" size={15} />
+              </span>
+              <input
+                ref={inputRef}
+                id="admin-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (error) setError('')
+                }}
+                placeholder="Enter password..."
+                required
+                className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-10 pr-10 font-mono text-[13px] text-ink placeholder-white/20 outline-none transition-colors focus:border-accent/60 focus:bg-white/[0.02]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-faint transition-colors hover:text-white"
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} size={15} />
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/[0.08] p-3 text-[12px] text-red-300 animate-shake">
+              <span className="shrink-0 text-red-400">⚠️</span>
+              <p>{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-[13px] font-semibold text-[#08090a] transition-all hover:bg-white hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+          >
+            <Icon name="unlock" size={15} />
+            <span>{isSubmitting ? 'Authenticating...' : 'Unlock Admin Portal'}</span>
+          </button>
+        </form>
+
+        {/* Back Link */}
+        <div className="mt-7 flex items-center justify-between border-t border-white/[0.06] pt-5 text-[11px]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-faint transition-colors hover:text-accent"
+          >
+            <Icon name="arrow-right" size={12} className="rotate-180" />
+            Back to Website
+          </button>
+          <span className="font-mono text-[9px] text-white/20">
+            Encrypted Session
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPanel({ isOpen, onClose }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return typeof window !== 'undefined' && Boolean(sessionStorage.getItem(ADMIN_STORAGE_KEY))
+  })
   const [activeTab, setActiveTab] = useState('contacts') // 'contacts' | 'chats'
   const [contacts, setContacts] = useState([])
   const [conversations, setConversations] = useState([])
@@ -68,10 +233,10 @@ export default function AdminPanel({ isOpen, onClose }) {
   }
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isAuthenticated) {
       fetchData()
     }
-  }, [isOpen])
+  }, [isOpen, isAuthenticated])
 
   // Lock body scroll when admin modal is open
   useEffect(() => {
@@ -91,7 +256,7 @@ export default function AdminPanel({ isOpen, onClose }) {
 
   // Fetch full conversation when selected
   useEffect(() => {
-    if (activeTab === 'chats' && selectedChatId) {
+    if (activeTab === 'chats' && selectedChatId && isAuthenticated) {
       setChatLoading(true)
       api
         .getAdminConversation(selectedChatId)
@@ -106,7 +271,12 @@ export default function AdminPanel({ isOpen, onClose }) {
         .catch(() => setChatMessages([]))
         .finally(() => setChatLoading(false))
     }
-  }, [activeTab, selectedChatId])
+  }, [activeTab, selectedChatId, isAuthenticated])
+
+  const handleSignOut = () => {
+    sessionStorage.removeItem(ADMIN_STORAGE_KEY)
+    setIsAuthenticated(false)
+  }
 
   const selectedContact = useMemo(() => {
     return contacts.find((c) => c.id === selectedContactId) || null
@@ -205,16 +375,38 @@ export default function AdminPanel({ isOpen, onClose }) {
 
   const handleOpenEmailClient = () => {
     if (!selectedContact) return
-    const subject = encodeURIComponent(`Re: Inquiry from Ravjot Singh Portfolio (${selectedContact.project || 'Project'})`)
+    const subject = encodeURIComponent(
+      `Re: Inquiry from Ravjot Singh Portfolio (${selectedContact.project || 'Project'})`
+    )
     const body = encodeURIComponent(
       replyText
-        ? `${replyText}\n\n---\nOriginal message:\n"${selectedContact.message}"`
+        ? `${replyText}\n\n---\nOriginal message from ${selectedContact.name}:\n"${selectedContact.message}"`
         : `Hi ${selectedContact.name},\n\nThank you for reaching out regarding ${selectedContact.project || 'your project'}!\n\nBest regards,\nRavjot Singh\nravjotsg03@gmail.com`
     )
     window.location.href = `mailto:${selectedContact.email}?subject=${subject}&body=${body}`
   }
 
   if (!isOpen) return null
+
+  // If not logged in, render the aesthetic Admin Login Landing Page!
+  if (!isAuthenticated) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin Login"
+        className="fixed inset-0 z-[120] flex flex-col bg-[#070809] text-ink backdrop-blur-2xl overflow-y-auto"
+      >
+        <AdminLoginView
+          onLoginSuccess={() => {
+            setIsAuthenticated(true)
+            fetchData()
+          }}
+          onClose={onClose}
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -273,7 +465,7 @@ export default function AdminPanel({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Actions */}
+        {/* Actions & Sign Out */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -282,6 +474,15 @@ export default function AdminPanel({ isOpen, onClose }) {
             className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-muted transition-colors hover:border-accent/40 hover:text-accent"
           >
             <Icon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            title="Sign Out (Lock Portal)"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 font-mono text-[11px] uppercase tracking-wider text-muted transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Icon name="lock" size={13} />
+            <span className="hidden sm:inline">Lock</span>
           </button>
           <button
             type="button"
