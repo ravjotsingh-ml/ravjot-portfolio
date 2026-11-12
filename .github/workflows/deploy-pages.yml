@@ -65,6 +65,11 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
+          # The Pages artifact is published as a tarball.
+          if [ -f artifact.tar ]; then
+            tar -xzf artifact.tar
+            rm -f artifact.tar
+          fi
           touch .nojekyll
           git init -q
           git config user.name "github-actions[bot]"
