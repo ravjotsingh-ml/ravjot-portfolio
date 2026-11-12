@@ -32,6 +32,8 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/ravjot-portfolio/' }}
       - name: Publish to the gh-pages branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cd dist
