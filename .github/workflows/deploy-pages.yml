@@ -67,7 +67,7 @@ jobs:
           cd dist
           # The Pages artifact is published as a tarball.
           if [ -f artifact.tar ]; then
-            tar -xzf artifact.tar
+            tar -xf artifact.tar
             rm -f artifact.tar
           fi
           touch .nojekyll
