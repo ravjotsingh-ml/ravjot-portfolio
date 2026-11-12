@@ -3,14 +3,14 @@ import { api } from '../lib/api'
 import Icon from './ui/Icon'
 
 const WELCOME_MESSAGE =
-  "Hi! I'm Ravjot's AI assistant. Ask me anything about his skills, projects, or experience."
+  "Hi! I'm Ravjot's AI & live assistant. Ask me anything about his skills, projects, or experience, or send a message directly to Ravjot and his support team!"
 
 const SUGGESTED_QUESTIONS = [
   'Tell me about Ravjot.',
   'What technical skills does he have?',
   'Explain his projects.',
   'What is his professional experience?',
-  'How can I contact him?',
+  'How can I hire or contact him?',
 ]
 
 const STORAGE_KEY = 'ravjot_chat_conversation_id'
@@ -233,11 +233,11 @@ export default function Chatbot() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold text-ink">
-                Ravjot's AI assistant
+                Ravjot · AI & Live Support
               </p>
               <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-faint">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-                Online · powered by Gemini
+                Online · Live Team & Gemini AI
               </p>
             </div>
             <button
